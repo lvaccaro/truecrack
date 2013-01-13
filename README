@@ -1,0 +1,24 @@
+TRUECRACK V2
+TrueCrack is a bruteforce password cracker for TrueCrypt (Copyrigth) volume.
+It is optimazed with Nvidia Cuda technology.
+It works with PBKDF2 (defined in PKCS5 v2.0) based on RIPEMD160 Key derivation 
+function and XTS block cipher mode of operation used for hard disk encryption 
+based on AES.
+
+LICENSE
+TrueCrack is an Open Source Software under GNU Public License version 3.
+This software is Based on TrueCrypt, freely available at http://www.truecrypt.org/
+
+AUTHOR
+The author Luca Vaccaro is an master student of Politecnico di Milano in 
+Engineering Informatics.
+
+INSTALLATION
+The software works on CPU or GPU. The configure procedure recognizes the
+installation of cuda libraries.
+sh autogen.sh
+./configure
+make
+sudo make install
+
+OPTIONS
