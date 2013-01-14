@@ -63,7 +63,7 @@ void core_dictionary(void) {
     // Retrieve block size dimension
 #ifdef _GPU_
    if (CORE_blocksize==0) 
-	CORE_blocksize=getMultiprocessorCount();
+	CORE_blocksize=1024;//getMultiprocessorCount();
 #else
    if (CORE_blocksize==0)
    	CORE_blocksize=BLOCK_SIZE;
@@ -73,8 +73,7 @@ void core_dictionary(void) {
     blockPwd=malloc(CORE_blocksize*PASSWORD_MAXSIZE*sizeof(char));
     blockPwd_init=malloc(CORE_blocksize*sizeof(int));
     blockPwd_length=malloc(CORE_blocksize*sizeof(int));
-    result=malloc(10000*sizeof(int));
-    // Open file of passwords
+   // Open file of passwords
     fp_words=file_open(CORE_wordsPath);
     // Read in volume header
     header_length = file_readHeader(CORE_volumePath,header);
@@ -109,6 +108,7 @@ void core_dictionary(void) {
             }
         }
 
+ 	result=malloc(block_size*sizeof(short int));
 #ifdef _GPU_
         // 2.2 Calculate the hash header keys decrypt the encrypted header and check the right header key with cuda procedure
         // PKCS5 is used to derive the primary header key(s) and secondary header key(s) (XTS mode) from the password
@@ -139,7 +139,7 @@ void core_dictionary(void) {
 		}
             }
         }
-
+	free(result);
         iblock++;
     }
     iblock--;
@@ -169,7 +169,6 @@ void core_dictionary(void) {
     free(blockPwd);
     free(blockPwd_init);
     free(blockPwd_length);
-    free(result);
 #ifdef _GPU_
     cuda_Free () ;
 #endif
@@ -241,7 +240,7 @@ void core_charset(void) {
 #ifdef _GPU_
         // 2.2 Calculate the hash header keys decrypt the encrypted header and check the right header key with cuda procedure
         // PKCS5 is used to derive the primary header key(s) and secondary header key(s) (XTS mode) from the password
-        result=malloc(10000*sizeof(short int));
+        result=malloc(maxcombination*sizeof(short int));
     
 	cuda_Core_charset ( strlen(CORE_charset), CORE_charset, wordlength, result) ;
 	
