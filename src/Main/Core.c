@@ -279,11 +279,19 @@ void core_charset(void) {
     /* 4. Print output message*/
     if (status==1) {
         // Retrieve the master key from last block
-        int j;
-
+        
         printf("Found password for volume \"%s\" in the charset \"%s\" of max length %d\n",CORE_volumePath,CORE_charset,CORE_maxlength);
-	computePwd_ (i, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
+        int j,l,offset;
+	offset=0;
+	for (j=0;j<wordlength;j++){
+		maxcombination=1;
+		for (l=0;l<maxcombination;l++)
+			maxcombination*=strlen(CORE_charset);
+		offset+=maxcombination;
+	}
+	computePwd_ (i+offset, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
 	printf("password: %s - length: %d\n",word,wordlength);
+
 
 	
     } else {
