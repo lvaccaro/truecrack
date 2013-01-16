@@ -100,10 +100,47 @@ int cpu_GetMaxPkcs5OutSize (void)
     return size;
 }
 
+int cpu_Core_charset(unsigned char *encryptedHeader, unsigned char *CORE_charset, int wordlength,int verbose) {
+    // PKCS5 is used to derive the primary header key(s) and secondary header key(s) (XTS mode) from the password
+    int i,j,value=-1,found,count;
+    unsigned char salt[PKCS5_SALT_SIZE];
+    unsigned char headerKey[256]={0};
+    unsigned char masterKey[256]={0};
+    int length;
+    unsigned char word[32];
+    memcpy (salt, encryptedHeader + HEADER_SALT_OFFSET, PKCS5_SALT_SIZE);
+    
+    int maxcombination=1;
+    for (i=0;i<wordlength;i++)
+       maxcombination*= strlen(CORE_charset);
+    
+    for (count=0;count<maxcombination;count++){
+		computePwd_ (count, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
+		word[wordlength]='\0';
+		
+		if (verbose==1)
+			printf("%d >> %d/%d - %s ",wordlength,count,maxcombination,word);
+
+		//void derive_key_ripemd160 (char *pwd, int pwd_len, char *salt, int salt_len, int iterations, char *dk, int dklen);
+		derive_key_ripemd160 ( word, wordlength+1, salt, PKCS5_SALT_SIZE, 2000, headerKey, cpu_GetMaxPkcs5OutSize ());
+	
+		value=cpu_Xts(encryptedHeader,headerKey,cpu_GetMaxPkcs5OutSize(), masterKey, &length);
+
+		if (value==SUCCESS) {
+			if (verbose==1)
+				printf("MATCH\n");
+			return count;
+		}else{
+			if (verbose==1)
+				printf("NO MATCH\n");
+		}
+        }
+	return -1;
+}
 
 
 
-void cpu_Core(int blocksize, unsigned char *encryptedHeader, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result) {
+void cpu_Core_dictionary(int blocksize, unsigned char *encryptedHeader, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result) {
     // PKCS5 is used to derive the primary header key(s) and secondary header key(s) (XTS mode) from the password
     int i,j,value=-1,found;
     unsigned char salt[PKCS5_SALT_SIZE];
@@ -124,8 +161,8 @@ void cpu_Core(int blocksize, unsigned char *encryptedHeader, unsigned char *bloc
 	    found=1;
         }
     }
-
 }
+
 // Converts a 64-bit unsigned integer (passed as two 32-bit integers for compatibility with non-64-bit
 // environments/platforms) into a little-endian 16-byte array.
 void cpu_Uint64ToLE16ByteArray (unsigned __int8 *byteBuf, unsigned __int32 highInt32, unsigned __int32 lowInt32)
