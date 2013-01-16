@@ -51,7 +51,8 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 @ENABLE_CPU_TRUE@am__append_1 = Rmd160.o CpuAes.o 
 @ENABLE_CPU_TRUE@am__append_2 = Pkcs5.o CpuCore.o
-@ENABLE_CPU_FALSE@am__append_3 = -D_GPU_ $(GENCODE_FLAGS)
+@ENABLE_CPU_FALSE@am__append_3 = -D_GPU_ $(GENCODE_FLAGS) -ftz=true \
+@ENABLE_CPU_FALSE@	-use_fast_math
 @ENABLE_CPU_FALSE@am__append_4 = #gpuCrypto.o
 bin_PROGRAMS = truecrack$(EXEEXT)
 subdir = src
@@ -94,7 +95,7 @@ AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = -I./Common/ -I./Crypto/ -I./Cuda/ -I./Main/ -I./ -lm -O3 \
-	-arch=sm_30 -ftz=true -use_fast_math $(am__append_3)
+	$(am__append_3)
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CUDA_CFLAGS = @CUDA_CFLAGS@
@@ -187,7 +188,6 @@ OBJS_CRYPTO = $(am__append_1)
 @ENABLE_CPU_FALSE@COMPILER = $(NVCC)
 @ENABLE_CPU_TRUE@COMPILER = $(CC)
 @ENABLE_CPU_FALSE@OBJ_CUDA = Cuda.o
-# CUDA code generation flags
 @ENABLE_CPU_FALSE@GENCODE_SM10 = -gencode arch=compute_10,code=sm_10
 @ENABLE_CPU_FALSE@GENCODE_SM20 = -gencode arch=compute_20,code=sm_20
 @ENABLE_CPU_FALSE@GENCODE_SM30 = -gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35

@@ -115,7 +115,7 @@ void core_dictionary(void) {
         cuda_Core_dictionary (block_size,blockPwd, blockPwd_init, blockPwd_length, result);
 //        cuda_Core(result);	
 #else
-        cpu_Core(block_size, header, blockPwd, blockPwd_init, blockPwd_length, result);
+        cpu_Core_dictionary(block_size, header, blockPwd, blockPwd_init, blockPwd_length, result);
 	
 #endif
         for (i=0;i<block_size && status!=1 ;i++) {
@@ -193,7 +193,7 @@ void computePwd_ (int number, int maxcombination, int charsetlength, unsigned ch
 }
 
 
-
+#ifdef _GPU_
 void core_charset(void) {
 
     /* Local variables */
@@ -203,13 +203,11 @@ void core_charset(void) {
     /* 1. Init procedure  */
     // Read in volume header
     header_length = file_readHeader(CORE_volumePath,header);
-#ifdef _GPU_
+
     // Allocation and initialization memory of constant structures for cuda procedure
     unsigned char salt[PKCS5_SALT_SIZE];
     memcpy (salt, header + HEADER_SALT_OFFSET, PKCS5_SALT_SIZE);
     cuda_Init (CORE_blocksize, salt,header) ;
-#endif
-
 
     /* 2. Block procedure
      * The algoritm reads and computes NUM_OF_BLOCK passwords each time.
@@ -226,8 +224,8 @@ void core_charset(void) {
       maxcombination=1;
 	for (i=0;i<wordlength;i++)
 		maxcombination*= strlen(CORE_charset);
-	
-	
+
+	result=malloc(maxcombination*sizeof(short int));
 	
         if (CORE_verbose) {
 	    for (i=0;i<maxcombination;i++) {
@@ -237,19 +235,13 @@ void core_charset(void) {
             }
         }
 
-#ifdef _GPU_
         // 2.2 Calculate the hash header keys decrypt the encrypted header and check the right header key with cuda procedure
         // PKCS5 is used to derive the primary header key(s) and secondary header key(s) (XTS mode) from the password
-        result=malloc(maxcombination*sizeof(short int));
     
-	cuda_Core_charset ( strlen(CORE_charset), CORE_charset, wordlength, result) ;
-	
-#else
-        printf("This implementation takes too much.. try with cuda\n");
-#endif
+	cuda_Core_charset ( strlen(CORE_charset), CORE_charset, wordlength, result) ;	
         for (i=0;i<maxcombination && status!=1 ;i++) {
 		if(result[i]==MATCH)
-			status=1;
+ 			status=1;
 	} 
 
         if (CORE_verbose) {
@@ -275,12 +267,16 @@ void core_charset(void) {
     wordlength--;
     i--;
 
-
     /* 4. Print output message*/
     if (status==1) {
         // Retrieve the master key from last block
-        
         printf("Found password for volume \"%s\" in the charset \"%s\" of max length %d\n",CORE_volumePath,CORE_charset,CORE_maxlength);
+	int l;
+	maxcombination=1;
+	for (l=0;l<wordlength;l++)
+		maxcombination*=strlen(CORE_charset);
+		
+	computePwd_ (i, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
         int j,l,offset;
 	offset=0;
 	for (j=0;j<wordlength;j++){
@@ -290,6 +286,8 @@ void core_charset(void) {
 		offset+=maxcombination;
 	}
 	computePwd_ (i+offset, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
+	word[wordlength]='\0';
+	printf("password: %s - length: %d\n",(char*)word,wordlength);
 	printf("password: %s - length: %d\n",word,wordlength);
 
 
@@ -299,8 +297,54 @@ void core_charset(void) {
         printf("Try \"%d\" words.\n",i);
 
     }
-#ifdef _GPU_
     cuda_Free () ;
+}
+
+#else
+
+void core_charset(void) {
+
+	/* Local variables */
+	short int status=0;			// value for the found rigth key
+	int i,j;				// counters for temporany cycles
+	
+	/* 1. Init procedure  */
+	// Read in volume header
+	header_length = file_readHeader(CORE_volumePath,header);
+
+	// Allocation and initialization memory of constant structures for cuda procedure
+	unsigned char salt[PKCS5_SALT_SIZE];
+	memcpy (salt, header + HEADER_SALT_OFFSET, PKCS5_SALT_SIZE);
+
+	/* 2. Crypt procedure */
+	unsigned char word[32];
+	unsigned short int wordlength=1;
+	unsigned short int maxcombination=1;
+	CORE_maxlength++;
+
+	for (wordlength=1;wordlength<CORE_maxlength && status==0;wordlength++){
+		i=cpu_Core_charset ( header, CORE_charset, wordlength,CORE_verbose);
+		if (i>0)
+			status=1;
+	}
+	wordlength--;
+	
+	/* 3. Print output message*/
+	if (status==1) {
+		// Retrieve the master key from last block
+		printf("Found password for volume \"%s\" in the charset \"%s\" of max length %d\n",CORE_volumePath,CORE_charset,CORE_maxlength);
+		int l;
+		maxcombination=1;
+		for (l=0;l<wordlength;l++)
+			maxcombination*=strlen(CORE_charset);
+			
+		computePwd_ (i, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
+		word[wordlength]='\0';
+		printf("password: %s - length: %d\n",(char*)word,wordlength);
+	} else {
+		printf("Not Found password for volume \"%s\"\n",CORE_volumePath);
+		printf("Try \"%d\" words.\n",i);
+	}
+}
 #endif
 
-}
