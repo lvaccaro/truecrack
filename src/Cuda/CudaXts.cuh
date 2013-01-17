@@ -99,16 +99,9 @@ enum
   ERR_CRC_KEY_SET
 };
 
-enum{
-  NODEFINED,
-  MATCH,
-  NOMATCH,
-};
 
 
-
-
-int cuda_Xts(unsigned char *encryptedHeader, unsigned char *headerKey, unsigned char *test);
+__device__ int cuda_Xts(unsigned char *encryptedHeader, unsigned char *headerKey, unsigned char *test);
 int cuda_XtsTest(unsigned char *encryptedHeader, unsigned char *headerKey, unsigned char *test);
 
 void cuda_DecryptBufferXTS (unsigned __int8 *buffer,

@@ -31,8 +31,8 @@ enum {
 
 int CORE_typeAttack;
 int CORE_verbose;
-const char *CORE_volumePath;
-const char *CORE_wordsPath;
+char *CORE_volumePath;
+char *CORE_wordsPath;
 unsigned char *CORE_charset;
 int CORE_maxlength;
 int CORE_blocksize;
