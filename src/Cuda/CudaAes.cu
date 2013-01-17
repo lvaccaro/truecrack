@@ -5,7 +5,7 @@ Collection of source files for AES encryption algorithm
 - Aestab.c
 */
 
-//#include "CudaAes.h"
+#include "CudaAes.cuh"
 
 
 #include "CudaAestab.cu"

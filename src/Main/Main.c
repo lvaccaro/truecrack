@@ -73,11 +73,11 @@ int main (int argc, char* argv[])
         */
     };
     /* The name of the file of words */
-    const char* wordlist_filename = NULL;
+    char* wordlist_filename = NULL;
     /* The name of the file of truecrypt volume */
-    const char* volume_filename = NULL;
+    char* volume_filename = NULL;
     /* The charset string */
-    const char* charset = NULL;
+    char* charset = NULL;
     /*The max length of words generated from charset */
     int maxlength=0;
     /* The type of attack */

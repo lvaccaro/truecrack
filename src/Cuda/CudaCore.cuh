@@ -30,6 +30,13 @@ extern "C"
 {
 #endif
 
+enum{
+  NODEFINED,
+  MATCH,
+  NOMATCH,
+};
+
+
 
 
 int getMultiprocessorCount (void);
