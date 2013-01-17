@@ -23,6 +23,7 @@
 #include "Charset.h"
 #ifdef _GPU_
   #include "CudaCore.cuh"
+  #include "CudaXts.cuh"
 #else
   #include "CpuCore.h"
 #endif
