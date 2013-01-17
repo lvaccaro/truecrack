@@ -34,7 +34,8 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 @ENABLE_CPU_TRUE@am__append_1 = Rmd160.o CpuAes.o 
 @ENABLE_CPU_TRUE@am__append_2 = Pkcs5.o CpuCore.o
-@ENABLE_CPU_FALSE@am__append_3 = -D_GPU_ $(GENCODE_FLAGS)
+@ENABLE_CPU_FALSE@am__append_3 = -D_GPU_ $(GENCODE_FLAGS) -ftz=true \
+@ENABLE_CPU_FALSE@	-use_fast_math
 @ENABLE_CPU_FALSE@am__append_4 = #gpuCrypto.o
 bin_PROGRAMS = truecrack$(EXEEXT)
 subdir = src
@@ -72,7 +73,7 @@ AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = -I./Common/ -I./Crypto/ -I./Cuda/ -I./Main/ -I./ -lm -O3 \
-	-arch=sm_30 -ftz=true -use_fast_math $(am__append_3)
+	$(am__append_3)
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CUDA_CFLAGS = @CUDA_CFLAGS@
