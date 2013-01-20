@@ -43,6 +43,10 @@ void core_dictionary(void);
 void core_charset(void);
 
 void core(void){
+	printf("%s v%s\n", SOFTWARE,VERSION);
+	printf("Website: %s\n",WEBSITE);
+	printf("Contact us: %s\n",EMAIL);
+	
 	if (CORE_typeAttack==ATTACK_DICTIONARY)
 		core_dictionary();
 	else if (CORE_typeAttack==ATTACK_CHARSET)
@@ -50,6 +54,7 @@ void core(void){
 	else 
 	  printf("Select an invalid operation mode\n");
 }
+
 
 #ifdef _GPU_
 void core_dictionary(void) {
@@ -118,7 +123,7 @@ void core_dictionary(void) {
 			printf("NO MATCH\n");
 			break;
 		  default:
-			printf("NOT DEFINED\n");
+			printf("ERROR\n");
 		}
             }
         }
@@ -132,18 +137,18 @@ void core_dictionary(void) {
     file_close(fp_words);
 
     /* 4. Print output message*/
+    uint64_t offset=iblock*CORE_blocksize;
     if (status==1) {
         // Retrieve the master key from last block
         int j;
-        printf("Found password for volume \"%s\" in words file \"%s\"\n",CORE_volumePath,CORE_wordsPath);
-        printf("Password[%d]: ",blockPwd_length[i]-1);
-        for (j=0;j<blockPwd_length[i];j++)
+	offset+=i;
+        printf("Found password: \"");
+	for (j=0;j<blockPwd_length[i];j++)
             printf("%c",blockPwd[blockPwd_init[i]+j]);
-        printf("\n");
+        printf("\" of length \"%d\", try \"%d\" words.\n",blockPwd_length[i]-1,offset);	
 	
     } else {
-        printf("Not Found password for volume \"%s\"\n",CORE_volumePath);
-        printf("Try \"%d\" words.\n",iblock*CORE_blocksize+i);
+	printf("No found password: try \"%d\" words.\n",iblock*CORE_blocksize+i);
 
     }
     free(blockPwd);
@@ -208,7 +213,7 @@ void core_dictionary(void) {
 			printf("NO MATCH\n");
 			break;
 		  default:
-			printf("NOT DEFINED\n");
+			printf("ERROR\n");
 		}
         }
         iblock++;
@@ -220,19 +225,16 @@ void core_dictionary(void) {
     file_close(fp_words);
 
     /* 4. Print output message*/
+    uint64_t offset=iblock;
     if (status==1) {
         // Retrieve the master key from last block
         int j;
-        printf("Found password for volume \"%s\" in words file \"%s\"\n",CORE_volumePath,CORE_wordsPath);    
-        printf("Password[%d]: ",blockPwd_length[0]);
-        for (j=0;j<blockPwd_length[0];j++)
+        printf("Found password: \"");
+	for (j=0;j<blockPwd_length[0];j++)
             printf("%c",blockPwd[j]);
-        printf("\n");
-	
+        printf("\" of length \"%d\", try \"%d\" words.\n",blockPwd_length[0],offset);	
     } else {
-        printf("Not Found password for volume \"%s\"\n",CORE_volumePath);
-        printf("Try \"%d\" words.\n",iblock);
-
+	    printf("No found password: try \"%d\" words.\n",offset);
     }
     free(blockPwd);
     free(blockPwd_init);
@@ -308,11 +310,12 @@ void core_charset(void) {
 		if(result[i]==MATCH)
  			status=1;
 	} 
-
         if (CORE_verbose) {
             for (j=0;j<maxcombination;j++) {
-                //printf("%d result : %02x\n", i, (unsigned char) (result[i]));
-                printf("%d result : ", j);
+                printf("%d >> ",j);
+		computePwd_ (j, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
+		word[wordlength]='\0';		
+		printf("%d - %d/%d >> %s : ",wordlength,j,maxcombination,word);
 		switch(result[j]){
 		  case MATCH: 
 			printf("MATCH\n");
@@ -321,7 +324,7 @@ void core_charset(void) {
 			printf("NO MATCH\n");
 			break;
 		  default:
-			printf("NOT DEFINED\n");
+			printf("ERROR\n");
 		}
             }
         }
@@ -333,31 +336,27 @@ void core_charset(void) {
     i--;
 
     /* 4. Print output message*/
-    if (status==1) {
-        // Retrieve the master key from last block
-        printf("Found password for volume \"%s\" in the charset \"%s\" of max length %d\n",CORE_volumePath,CORE_charset,CORE_maxlength);
-	int l;
-	maxcombination=1;
-	for (l=0;l<wordlength;l++)
-		maxcombination*=strlen(CORE_charset);
-		
-	computePwd_ (i, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
-        int j,offset;
-	offset=0;
-	for (j=0;j<wordlength;j++){
+    	int l,k;
+	uint64_t offset=0;
+	for (k=1;k<=wordlength;k++){
 		maxcombination=1;
-		for (l=0;l<maxcombination;l++)
+		for (l=0;l<k;l++)
 			maxcombination*=strlen(CORE_charset);
 		offset+=maxcombination;
 	}
-	computePwd_ (i+offset, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
-	word[wordlength]='\0';
-	printf("password: %s - length: %d\n",(char*)word,wordlength);	
-    } else {
-        printf("Not Found password for volume \"%s\"\n",CORE_volumePath);
-        printf("Try \"%d\" words.\n",i);
+	if (status==1) {
+		// Retrieve the master key from last block
+		maxcombination=1;
+		for (l=0;l<wordlength;l++)
+			maxcombination*=strlen(CORE_charset);
+		computePwd_ (i, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
+		word[wordlength]='\0';
+		offset+=i;
+		printf("Found password: \"%s\" of length \"%d\", try \"%d\" words.\n",(char*)word,wordlength,offset);
+	} else {
+		printf("No found password: try \"%d\" words.\n",offset);
+	}
 
-    }
     cuda_Free () ;
 }
 
@@ -391,20 +390,24 @@ void core_charset(void) {
 	wordlength--;
 	
 	/* 3. Print output message*/
+	int l,k;
+	uint64_t offset=0;
+	for (k=1;k<=wordlength;k++){
+		maxcombination=1;
+		for (l=0;l<k;l++)
+			maxcombination*=strlen(CORE_charset);
+		offset+=maxcombination;
+	}
 	if (status==1) {
 		// Retrieve the master key from last block
-		printf("Found password for volume \"%s\" in the charset \"%s\" of max length %d\n",CORE_volumePath,CORE_charset,CORE_maxlength);
-		int l;
 		maxcombination=1;
 		for (l=0;l<wordlength;l++)
 			maxcombination*=strlen(CORE_charset);
-			
 		computePwd_ (i, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
 		word[wordlength]='\0';
-		printf("password: %s - length: %d\n",(char*)word,wordlength);
+		printf("Found password: \"%s\" of length \"%d\", try \"%d\" words.\n",(char*)word,wordlength,offset);
 	} else {
-		printf("Not Found password for volume \"%s\"\n",CORE_volumePath);
-		printf("Try \"%d\" words.\n",i);
+		printf("No found password: try \"%d\" words.\n",offset);
 	}
 }
 #endif
