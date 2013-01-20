@@ -50,7 +50,13 @@ int getMultiprocessorCount (void){
 //#define NUMBLOCKS		12
 #define NUMTHREADSXBLOCK	128
 
-
+static void HandleError( cudaError_t err, const char *file,  int line ) {
+        if (err != cudaSuccess) {
+                printf( "%s in %s at line %d\n", cudaGetErrorString( err ),  file, line );
+                exit( EXIT_FAILURE );
+        }
+}
+#define HANDLE_ERROR( err ) (HandleError( err, __FILE__, __LINE__ ))
 
 
 __device__ void computePwd (int number, int maxcombination, int charsetlength, unsigned char *charset, int wordlength, unsigned char *word){
@@ -304,17 +310,17 @@ void cuda_Core_dictionary ( int block_currentsize, unsigned char *blockPwd, int 
 
 void cuda_Core_charset ( unsigned short int charset_length, unsigned char *charset, unsigned short int password_length, short int *result) 
 {
-	unsigned short int maxcombination=1;
+	uint64_t maxcombination=1;
 	for (int i=0;i<password_length;i++)
 		maxcombination*=charset_length;
 
 	unsigned char *dev_charset = NULL;
-	cudaMalloc((void **)&dev_charset, charset_length*sizeof(unsigned char));
-	cudaMalloc ( (void **)&dev_result, maxcombination * sizeof(short int)) ;
-	cudaMemcpy(dev_charset, charset, charset_length*sizeof(unsigned char), cudaMemcpyHostToDevice);
-	cudaMemcpy(dev_result, result, maxcombination*sizeof(short int), cudaMemcpyHostToDevice);
+	HANDLE_ERROR(cudaMalloc((void **)&dev_charset, charset_length*sizeof(unsigned char)));
+	HANDLE_ERROR(cudaMalloc ( (void **)&dev_result, maxcombination * sizeof(short int))) ;
+	HANDLE_ERROR(cudaMemcpy(dev_charset, charset, charset_length*sizeof(unsigned char), cudaMemcpyHostToDevice));
+	HANDLE_ERROR(cudaMemcpy(dev_result, result, maxcombination*sizeof(short int), cudaMemcpyHostToDevice));
      
-	int numBlocks=maxcombination/NUMTHREADSXBLOCK+1;
+	uint64_t numBlocks=maxcombination/NUMTHREADSXBLOCK+1;
 	int numThread=NUMTHREADSXBLOCK;
 	if (maxcombination<NUMTHREADSXBLOCK)
 		numThread=maxcombination;
@@ -322,13 +328,10 @@ void cuda_Core_charset ( unsigned short int charset_length, unsigned char *chars
 	cuda_Kernel_charset<<<numBlocks,numThread>>>(dev_salt, dev_header, charset_length, dev_charset, password_length, maxcombination,dev_result);
 	
 	// Copy the device result vector in device memory to the host result vector in host memory.
-	cudaError_t err=  cudaMemcpy(result, dev_result, maxcombination*sizeof(short int), cudaMemcpyDeviceToHost);
-	if (err!=cudaSuccess){
-		printf("->%s in %s at line %d\n",cudaGetErrorString(err),__FILE__,__LINE__);
-	}
+	HANDLE_ERROR( cudaMemcpy(result, dev_result, maxcombination*sizeof(short int), cudaMemcpyDeviceToHost));
 	
-	cudaFree(dev_charset);
-	cudaFree(dev_result);
+	HANDLE_ERROR(cudaFree(dev_charset));;
+	HANDLE_ERROR(cudaFree(dev_result));;
 }
 
    
