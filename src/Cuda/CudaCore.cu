@@ -59,7 +59,7 @@ static void HandleError( cudaError_t err, const char *file,  int line ) {
 #define HANDLE_ERROR( err ) (HandleError( err, __FILE__, __LINE__ ))
 
 
-__device__ void computePwd (int number, int maxcombination, int charsetlength, unsigned char *charset, int wordlength, unsigned char *word){
+__device__ void computePwd (uint64_t number, uint64_t maxcombination, int charsetlength, unsigned char *charset, int wordlength, unsigned char *word){
     unsigned short i=0;
     if (number>=maxcombination) return;
     for (i=0;i<wordlength;i++)
@@ -112,10 +112,10 @@ __device__ void cuda_Pbkdf2_charset ( unsigned char *salt, unsigned char *pwd, i
     	unsigned short int charset_length,
     	unsigned char *charset,
     	unsigned short int password_length,
-    	unsigned short int maxcombination,
+    	uint64_t maxcombination,
     	 short int *result)
  {
-	int numData = blockIdx.x*blockDim.x+threadIdx.x;
+	uint64_t numData = blockIdx.x*blockDim.x+threadIdx.x;
 	__align__(8) unsigned char headerkey[192];
 	__align__(8) unsigned char headerDecrypted[512];
 	__align__(8) unsigned char pwd[8];
