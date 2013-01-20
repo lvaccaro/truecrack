@@ -62,7 +62,7 @@ void core_dictionary(void) {
     /* Local variables */
     FILE *fp_words;			// file structures for words file
     short int status=0;			// value for the found rigth key
-    int i,j;				// counters for temporany cycles
+    int i,j,k;				// counters for temporany cycles
     int block_size=0, iblock=0;		// counters for block
 
     /* 1. Init procedure  */
@@ -112,8 +112,8 @@ void core_dictionary(void) {
             for (j=0;j<block_size;j++) {
                 //printf("%d result : %02x\n", i, (unsigned char) (result[i]));
                 printf("%d >> ",j);
-                for (i=0;i<blockPwd_length[j];i++)
-                    printf("%c",blockPwd[blockPwd_init[j]+i]);
+                for (k=0;k<blockPwd_length[j];k++)
+                    printf("%c",blockPwd[blockPwd_init[j]+k]);
                 printf(" : ");
 		switch(result[j]){
 		  case MATCH: 
@@ -137,7 +137,7 @@ void core_dictionary(void) {
     file_close(fp_words);
 
     /* 4. Print output message*/
-    uint64_t offset=iblock*CORE_blocksize;
+    uint64_t offset=iblock*CORE_blocksize+i;
     if (status==1) {
         // Retrieve the master key from last block
         int j;
@@ -148,7 +148,7 @@ void core_dictionary(void) {
         printf("\" of length \"%d\", try \"%d\" words.\n",blockPwd_length[i]-1,offset);	
 	
     } else {
-	printf("No found password: try \"%d\" words.\n",iblock*CORE_blocksize+i);
+	printf("No found password: try \"%d\" words.\n",offset);
 
     }
     free(blockPwd);
@@ -294,14 +294,6 @@ void core_charset(void) {
 
 	result=malloc(maxcombination*sizeof(short int));
 	
-        if (CORE_verbose) {
-	    for (i=0;i<maxcombination;i++) {
-		computePwd_ (i, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
-		word[wordlength]='\0';
-		printf("%d/%d password : %s\n",i,maxcombination,word);
-            }
-        }
-
         // 2.2 Calculate the hash header keys decrypt the encrypted header and check the right header key with cuda procedure
         // PKCS5 is used to derive the primary header key(s) and secondary header key(s) (XTS mode) from the password
     
