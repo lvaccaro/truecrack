@@ -315,7 +315,6 @@ void core_charset(void) {
 	} 
         if (CORE_verbose) {
             for (j=0;j<maxcombination;j++) {
-                printf("%d >> ",j);
 		computePwd_ (j, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
 		word[wordlength]='\0';		
 		printf("%d - %d/%d >> %s : ",wordlength,j,maxcombination,word);
