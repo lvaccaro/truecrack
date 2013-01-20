@@ -265,7 +265,7 @@ void core_charset(void) {
 
     /* Local variables */
     short int status=0;			// value for the found rigth key
-    int i,j;				// counters for temporany cycles
+    uint64_t i,j;			// counters for temporany cycles
     
     /* 1. Init procedure  */
     // Read in volume header
@@ -284,7 +284,7 @@ void core_charset(void) {
      */
     unsigned char word[32];
     unsigned short int wordlength=1;
-    unsigned short int maxcombination=1;
+    uint64_t maxcombination=1;
     CORE_maxlength++;
 
     while ( wordlength <  CORE_maxlength) {
@@ -293,6 +293,8 @@ void core_charset(void) {
 		maxcombination*= strlen(CORE_charset);
 
 	result=malloc(maxcombination*sizeof(short int));
+	if (result==NULL)
+		perror("Memory could not be allocated. ");
 	
         // 2.2 Calculate the hash header keys decrypt the encrypted header and check the right header key with cuda procedure
         // PKCS5 is used to derive the primary header key(s) and secondary header key(s) (XTS mode) from the password
@@ -358,7 +360,7 @@ void core_charset(void) {
 
 	/* Local variables */
 	short int status=0;			// value for the found rigth key
-	int i,j;				// counters for temporany cycles
+	uint64_t i,j;				// counters for temporany cycles
 	
 	/* 1. Init procedure  */
 	// Read in volume header
@@ -382,7 +384,7 @@ void core_charset(void) {
 	wordlength--;
 	
 	/* 3. Print output message*/
-	int l,k;
+	uint64_t l,k;
 	uint64_t offset=0;
 	for (k=1;k<=wordlength;k++){
 		maxcombination=1;
