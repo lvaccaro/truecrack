@@ -98,7 +98,11 @@ void core_dictionary(void) {
         if (block_size==0)
             break;
 
- 	result=malloc(block_size*sizeof(short int));
+ 	result=malloc(block_size*sizeof(short int));	
+	if (result==NULL){
+		perror("Memory could not be allocated. ");
+		exit( EXIT_FAILURE );
+	}
         // 2.2 Calculate the hash header keys decrypt the encrypted header and check the right header key with cuda procedure
         // PKCS5 is used to derive the primary header key(s) and secondary header key(s) (XTS mode) from the password
         cuda_Core_dictionary (block_size,blockPwd, blockPwd_init, blockPwd_length, result);
@@ -172,6 +176,10 @@ void core_dictionary(void) {
 	blockPwd_init=malloc(sizeof(int));
 	blockPwd_length=malloc(sizeof(int));
 	result=malloc(sizeof(short int));
+	if (result==NULL){
+		perror("Memory could not be allocated. ");
+		exit( EXIT_FAILURE );
+	}
 	// Open file of passwords
 	fp_words=file_open(CORE_wordsPath);
 	// Read in volume header
@@ -293,9 +301,10 @@ void core_charset(void) {
 		maxcombination*= strlen(CORE_charset);
 
 	result=malloc(maxcombination*sizeof(short int));
-	if (result==NULL)
+	if (result==NULL){
 		perror("Memory could not be allocated. ");
-	
+		exit( EXIT_FAILURE );
+	}
         // 2.2 Calculate the hash header keys decrypt the encrypted header and check the right header key with cuda procedure
         // PKCS5 is used to derive the primary header key(s) and secondary header key(s) (XTS mode) from the password
     
