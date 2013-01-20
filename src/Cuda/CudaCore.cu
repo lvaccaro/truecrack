@@ -48,7 +48,7 @@ int getMultiprocessorCount (void){
 
 //#define RESIDENTTHREADS		1536
 //#define NUMBLOCKS		12
-#define NUMTHREADSXBLOCK	128
+#define NUMTHREADSXBLOCK	256
 
 static void HandleError( cudaError_t err, const char *file,  int line ) {
         if (err != cudaSuccess) {
