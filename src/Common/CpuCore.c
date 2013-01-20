@@ -118,20 +118,20 @@ int cpu_Core_charset(unsigned char *encryptedHeader, unsigned char *CORE_charset
 		computePwd_ (count, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
 		word[wordlength]='\0';
 		
-		if (verbose==1)
+		if (verbose)
 			printf("%d - %d/%d >> %s : ",wordlength,count,maxcombination,word);
 
 		//void derive_key_ripemd160 (char *pwd, int pwd_len, char *salt, int salt_len, int iterations, char *dk, int dklen);
 		derive_key_ripemd160 ( word, wordlength+1, salt, PKCS5_SALT_SIZE, 2000, headerKey, cpu_GetMaxPkcs5OutSize ());
 	
 		value=cpu_Xts(encryptedHeader,headerKey,cpu_GetMaxPkcs5OutSize(), masterKey, &length);
-
+			
 		if (value==SUCCESS) {
-			if (verbose==1)
+			if (verbose)
 				printf("MATCH\n");
 			return count;
 		}else{
-			if (verbose==1)
+			if (verbose)
 				printf("NO MATCH\n");
 		}
         }

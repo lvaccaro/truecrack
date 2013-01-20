@@ -33,22 +33,29 @@ stdout or stderr), and exit the program with EXIT_CODE. Does not
 return. */
 void print_usage (FILE* stream, int exit_code)
 {
-    fprintf (stream,  "Bruteforce password cracker for Truecrypt volume.\n"
-             "Optimazed with Nvidia Cuda technology.\n"
-	     "Based on TrueCrypt, freely available at http://www.truecrypt.org/\n"
-             "Copyright (c) 2011 by Luca Vaccaro\n"
-            );
+	fprintf(stream,"%s v%s\n", SOFTWARE,VERSION);
+	fprintf(stream,"Website: %s\n",WEBSITE);
+	fprintf(stream,"Contact us: %s\n",EMAIL);
+	fprintf(stream,"%s\n",MESSAGE);
 
-    fprintf (stream, "Usage: %s options [ inputfile | value ] volumefile\n", program_name);
-    fprintf (stream,
-             " -h --help            Display this usage information.\n"
-             " -t --truecrypt FILE  Truecrypt volume file.\n"
-             " -w --wordlist FILE   Wordlist mode, read words from FILE.\n"
-	     " -m --maxlength INT   Charset mode, max length of words generated.\n"
-             " -c --charset STRING  Charset mode, create words from charset STRING.\n"
-	     " -b --blocksize INT   Block size of words parallel computed.\n"
-             " -v --verbose         Show cracked passwords.\n"
-            );
+    fprintf (stream, "\nUsage:\n"
+		" %s -t <truecrypt_file> -w <wordlist_file> [-b <parallel_block>]\n"
+		" %s -t <truecrypt_file> -c <charset> -m <maxlength>\n"
+		, program_name, program_name);
+    fprintf (stream, "\nOptions:\n"
+		" -h --help            Display this usage information.\n"
+		" -t --truecrypt FILE  Truecrypt volume file.\n"
+		" -w --wordlist FILE   Wordlist file for dictionary attack.\n"
+		" -b --blocksize INT   Number of concurrent parallel computation for dictionary attack (board dependent).\n"
+		" -c --charset STRING  Alphabet to generate the passwords for charset attack.\n"
+		" -m --maxlength INT   Max length of passwords for charset attack.\n"
+		" -v --verbose         Show verbose computation messages.\n"
+		);
+    fprintf (stream, "\nSample:\n"
+	" Dictionary mode: %s --truecrypt ./volume --wordlist ./dictionary.txt \n"
+	" Charset mode: %s --truecrypt ./volume --charset ./dictionary.txt --maxlength 10\n"
+	, program_name, program_name);
+    
     exit (exit_code);
 }
 
