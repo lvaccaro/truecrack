@@ -107,7 +107,7 @@ int cpu_Core_charset(unsigned char *encryptedHeader, unsigned char *CORE_charset
     unsigned char headerKey[256]={0};
     unsigned char masterKey[256]={0};
     int length;
-    unsigned char word[32];
+    unsigned char word[MAXWORDSIZE];
     memcpy (salt, encryptedHeader + HEADER_SALT_OFFSET, PKCS5_SALT_SIZE);
     
     int maxcombination=1;
