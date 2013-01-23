@@ -20,7 +20,7 @@
 #define HEADER_CORE
 
 #define SOFTWARE	"TrueCrack"
-#define VERSION		"2.1"
+#define VERSION		"2.5"
 #define WEBSITE		"http://code.google.com/p/truecrack"
 #define AUTHOR		"Luca Vaccaro"
 #define EMAIL		"infotruecrack@gmail.com"
