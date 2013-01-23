@@ -47,31 +47,6 @@
 #include "Pkcs5.h"
 #include "CpuAes.h"
 //#endif
-/*
-int readWords(char *wordPath, char *words[]){
-	FILE *fp;
-	char buffer[32];
-	int i;
-
-	fp=fopen(wordPath,"r");
-	if (fp == NULL) {
-		perror ("Error opening volume file");
-		return ;
-	}
-
-	i=0;
-	while ( fgets (buffer , 32 , fp) != NULL && i<512){
-		words[i]= (char*) malloc (sizeof(char)*strlen(buffer));
-		memcpy(words[i],buffer,strlen(buffer));
-		words[i][strlen(buffer)-1]='\0'; //remmember the \0
-		i++;
-	}
-	return i;
-
-
-	fclose(fp);
-}
-*/
 
 FILE *file_open (char *wordPath) {
     int i;
@@ -90,27 +65,13 @@ int file_close (FILE *fp) {
     fclose(fp);
     return 1;
 }
-/*
-int file_readWordsBlock (File *fp, char *words[], int size){
-	char buffer[32];
-	int i;
 
-	i=0;
-	while ( fgets (buffer , 32 , fp) != NULL && i<size){
-		words[i]= (char*) malloc (sizeof(char)*strlen(buffer));
-		memcpy(words[i],buffer,strlen(buffer));
-		words[i][strlen(buffer)-1]='\0'; //remmember the \0
-		i++;
-	}
-	return i;
-
-}*/
 int file_readWordsBlock (FILE *fp, int block_size, char *words, int *words_init, int *words_length) {
-    char buffer[64];
+    char buffer[MAXWORDSIZE];
     int i=0;
 
     for (i=0;i<block_size;i++) {
-        if (fgets (buffer , 64 , fp) == NULL)
+        if (fgets (buffer , MAXWORDSIZE , fp) == NULL)
             return i;
         if (i==0)
             words_init[0]=0;

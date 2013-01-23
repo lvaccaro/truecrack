@@ -290,7 +290,7 @@ void core_charset(void) {
      * a block is implement how a single array of sequentially words; there are also provide
      * support vector init and length for each words.
      */
-    unsigned char word[32];
+    unsigned char word[MAXWORDSIZE];
     unsigned short int wordlength=1;
     uint64_t maxcombination=1;
     CORE_maxlength++;
@@ -379,7 +379,7 @@ void core_charset(void) {
 	memcpy (salt, header + HEADER_SALT_OFFSET, PKCS5_SALT_SIZE);
 
 	/* 2. Crypt procedure */
-	unsigned char word[32];
+	unsigned char word[MAXWORDSIZE];
 	unsigned short int wordlength=1;
 	unsigned short int maxcombination=1;
 	CORE_maxlength++;
