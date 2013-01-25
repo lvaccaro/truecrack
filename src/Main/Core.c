@@ -295,7 +295,7 @@ void core_charset(void) {
     uint64_t maxcombination=1;
     CORE_maxlength++;
 
-    while ( wordlength <  CORE_maxlength) {
+    while ( wordlength <  CORE_maxlength && status==0) {
       maxcombination=1;
 	for (i=0;i<wordlength;i++)
 		maxcombination*= strlen(CORE_charset);
