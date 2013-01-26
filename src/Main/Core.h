@@ -20,7 +20,7 @@
 #define HEADER_CORE
 
 #define SOFTWARE	"TrueCrack"
-#define VERSION		"2.5"
+#define VERSION		"2.6"
 #define WEBSITE		"http://code.google.com/p/truecrack"
 #define AUTHOR		"Luca Vaccaro"
 #define EMAIL		"infotruecrack@gmail.com"
@@ -35,14 +35,25 @@ enum {
     ATTACK_CHARSET
 };
 
-int CORE_typeAttack;
-int CORE_verbose;
-char *CORE_volumePath;
-char *CORE_wordsPath;
-unsigned char *CORE_charset;
-int CORE_maxlength;
-int CORE_blocksize;
 
+/* The name of the file of words */
+char *CORE_wordsPath;
+/* The name of the file of truecrypt volume */
+char *CORE_volumePath;
+/* The charset string */
+unsigned char *CORE_charset;
+/*The max length of words generated from charset */
+int CORE_maxlength;
+/*The min length of words generated from charset */
+int CORE_minlength;
+/* The type of attack */
+int CORE_typeAttack;
+/* Size of the block of parallel words*/
+int CORE_blocksize;
+/* Whether to display verbose messages. */
+int CORE_verbose;
+
+/* Main function */
 void core(void);
 
 #endif

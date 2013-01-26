@@ -273,7 +273,7 @@ void core_charset(void) {
 
     /* Local variables */
     short int status=0;			// value for the found rigth key
-    uint64_t i,j;			// counters for temporany cycles
+    uint64_t i,j,k;			// counters for temporany cycles
     
     /* 1. Init procedure  */
     // Read in volume header
@@ -291,11 +291,11 @@ void core_charset(void) {
      * support vector init and length for each words.
      */
     unsigned char word[MAXWORDSIZE];
-    unsigned short int wordlength=1;
+    unsigned short int wordlength;
     uint64_t maxcombination=1;
     CORE_maxlength++;
 
-    while ( wordlength <  CORE_maxlength && status==0) {
+    for ( wordlength=CORE_minlength; wordlength <  CORE_maxlength && status==0; wordlength++) {
       maxcombination=1;
 	for (i=0;i<wordlength;i++)
 		maxcombination*= strlen(CORE_charset);
@@ -314,33 +314,40 @@ void core_charset(void) {
  			status=1;
 	} 
         if (CORE_verbose) {
-            for (j=0;j<maxcombination;j++) {
-		computePwd_ (j, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
-		word[wordlength]='\0';		
-		printf("%d - %d/%d >> %s : ",wordlength,j,maxcombination,word);
-		switch(result[j]){
-		  case MATCH: 
-			printf("MATCH\n");
-			break;
-		  case NOMATCH:
-			printf("NO MATCH\n");
-			break;
-		  default:
-			printf("ERROR\n");
+		for (j=0;j<maxcombination;j++) {
+			computePwd_ (j, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
+			word[wordlength]='\0';		
+			/*printf("maxcombination=%d\n",maxcombination);
+			printf("j=%d\n",j);
+			printf("wordlength=%d\n",wordlength);
+			printf("word=%s\n",word);
+			printf("result[%d]=%d\n",j,result[j]);
+			*/
+			printf("%d - %d / %d >> ",wordlength,(int)j,(int)maxcombination);
+			for (k=0;k<wordlength;k++)
+				printf("%c",word[k]);
+			printf(" : ");
+			switch(result[j]){
+			  case MATCH: 
+				printf("MATCH\n");
+				break;
+			  case NOMATCH:
+				printf("NO MATCH\n");
+				break;
+			  default:
+				printf("ERROR\n");
+			}
 		}
-            }
         }
         free(result);
-
-        wordlength++;
     }
     wordlength--;
     i--;
 
     /* 4. Print output message*/
-    	int l,k;
+    	int l;
 	uint64_t offset=0;
-	for (k=1;k<=wordlength;k++){
+	for (k=CORE_minlength;k<=wordlength;k++){
 		maxcombination=1;
 		for (l=0;l<k;l++)
 			maxcombination*=strlen(CORE_charset);
@@ -385,7 +392,7 @@ void core_charset(void) {
 	unsigned short int maxcombination=1;
 	CORE_maxlength++;
 
-	for (wordlength=1;wordlength<CORE_maxlength && status==0;wordlength++){
+	for (wordlength=CORE_minlength;wordlength<CORE_maxlength && status==0;wordlength++){
 		i=cpu_Core_charset ( header, CORE_charset, wordlength,CORE_verbose);
 		if (i>0)
 			status=1;
@@ -395,7 +402,7 @@ void core_charset(void) {
 	/* 3. Print output message*/
 	uint64_t l,k;
 	uint64_t offset=0;
-	for (k=1;k<=wordlength;k++){
+	for (k=CORE_minlength;k<=wordlength;k++){
 		maxcombination=1;
 		for (l=0;l<k;l++)
 			maxcombination*=strlen(CORE_charset);
