@@ -360,6 +360,7 @@ void core_charset(void) {
 	}
 
     cuda_Free () ;
+
 }
 
 #else

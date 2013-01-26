@@ -356,4 +356,6 @@ void cuda_Free(void) {
 	cudaFree(dev_blockPwd_init);
 	cudaFree(dev_blockPwd_length);
 	cudaFree(dev_header);
+	cudaDeviceReset();
+
 }
