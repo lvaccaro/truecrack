@@ -43,13 +43,14 @@ void print_usage (FILE* stream, int exit_code)
 		" %s -t <truecrypt_file> -c <charset> -m <maxlength>\n"
 		, program_name, program_name);
     fprintf (stream, "\nOptions:\n"
-		" -h --help            Display this usage information.\n"
-		" -t --truecrypt FILE  Truecrypt volume file.\n"
-		" -w --wordlist FILE   Wordlist file for dictionary attack.\n"
-		" -b --blocksize INT   Number of concurrent parallel computation for dictionary attack (board dependent).\n"
-		" -c --charset STRING  Alphabet to generate the passwords for charset attack.\n"
-		" -m --maxlength INT   Max length of passwords for charset attack.\n"
-		" -v --verbose         Show verbose computation messages.\n"
+		" -h --help            			Display this information.\n"
+		" -t --truecrypt <truecrypt_file>  	Truecrypt volume file.\n"
+		" -w --wordlist <wordlist_file>  	File of words, for Dictionary attack.\n"
+		" -b --blocksize <parallel_blocks>   	Number of parallel computations, for Dictionary attack (board dependent).\n"
+		" -c --charset <alphabet>		Alphabet to generate the passwords for charset attack.\n"
+		" -m --maxlength <maxlength>		Maximum length of passwords, for Charset attack.\n"
+		" -s --startlength <minlength>		Start length of passwords, for Charset attack.\n"
+		" -v --verbose         			Show computation messages.\n"
 		);
     fprintf (stream, "\nSample:\n"
 	" Dictionary mode: %s --truecrypt ./volume --wordlist ./dictionary.txt \n"
@@ -65,7 +66,7 @@ int main (int argc, char* argv[])
 {
     int next_option;
     /* A string listing valid short options letters.*/
-    const char* const short_options = "ht:w:c:m:b:v";
+    const char* const short_options = "ht:w:c:m:s:b:v";
     /* An array describing valid long options. */
     const struct option long_options[] = {
         { "help", 0, NULL, 'h' },
@@ -73,6 +74,7 @@ int main (int argc, char* argv[])
         { "wordlist",1, NULL, 'w' },
         { "charset",1, NULL, 'c' },
 	{ "maxlength",1, NULL, 'm' },
+	{ "startlength",1, NULL, 's' },
 	{ "blocksize",1,NULL, 'b' },
         { "verbose", 0, NULL, 'v' },
         { NULL, 0, NULL, 0 }
@@ -87,6 +89,8 @@ int main (int argc, char* argv[])
     char* charset = NULL;
     /*The max length of words generated from charset */
     int maxlength=0;
+    /*The min length of words generated from charset */
+    int minlength=0;
     /* The type of attack */
     int typeAttack=-1;
     /* Size of the block of parallel words*/
@@ -128,7 +132,13 @@ int main (int argc, char* argv[])
             maxlength = atoi(optarg);
             typeAttack=1;
             break;
-        case 'b':
+        case 's':
+            /* -s or --startlength */
+            /* This option takes an argument, the startlength of generated words*/
+            minlength = atoi(optarg);
+            typeAttack=1;
+            break;
+	case 'b':
             blocksize = atoi(optarg);
             break;
         case 'v':
@@ -176,6 +186,10 @@ int main (int argc, char* argv[])
 	    CORE_maxlength=maxlength;
 	 else
             print_usage (stdout, 0);
+	if (minlength>0)
+	    CORE_minlength=minlength;
+	else
+	    CORE_minlength=1;
 	
     } else
         print_usage (stdout, 0);
