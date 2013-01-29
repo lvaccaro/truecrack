@@ -20,7 +20,7 @@
 #define HEADER_CORE
 
 #define SOFTWARE	"TrueCrack"
-#define VERSION		"2.6"
+#define VERSION		"2.7"
 #define WEBSITE		"http://code.google.com/p/truecrack"
 #define AUTHOR		"Luca Vaccaro"
 #define EMAIL		"infotruecrack@gmail.com"
@@ -29,12 +29,11 @@
 
 #define BLOCK_SIZE 	1024
 
-/* Type of supported bruteforce. */
+/* Support bruteforce. */
 enum {
     ATTACK_DICTIONARY,
     ATTACK_CHARSET
 };
-
 
 /* The name of the file of words */
 char *CORE_wordsPath;
@@ -52,6 +51,8 @@ int CORE_typeAttack;
 int CORE_blocksize;
 /* Whether to display verbose messages. */
 int CORE_verbose;
+/* Key derivation function. */
+int CORE_keyDerivationFunction;
 
 /* Main function */
 void core(void);

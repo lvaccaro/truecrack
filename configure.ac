@@ -39,7 +39,13 @@ AC_CONFIG_FILES([Makefile
                  src/Makefile])
 
 
-
+# Setup for MACOSX
+#ifeq "$(shell uname -s)" "Darwin"
+# ------------------------------------------------------------------------------
+AC_CANONICAL_HOST    # needs to be called at some point earlier 
+AM_CONDITIONAL([DARWIN], 
+    [case $host_os in darwin*) true;; *) false;; esac]) 
+    
 # Setup CUDA paths
 # ------------------------------------------------------------------------------
 AC_ARG_WITH([cuda],
