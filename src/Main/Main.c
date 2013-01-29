@@ -39,12 +39,13 @@ void print_usage (FILE* stream, int exit_code)
 	fprintf(stream,"%s\n",MESSAGE);
 
     fprintf (stream, "\nUsage:\n"
-		" %s -t <truecrypt_file> -w <wordlist_file> [-b <parallel_block>]\n"
-		" %s -t <truecrypt_file> -c <charset> -m <maxlength>\n"
+		" %s -t <truecrypt_file> -k <ripemd160|sha512|whirlpool> -w <wordlist_file> [-b <parallel_block>]\n"
+		" %s -t <truecrypt_file> -k <ripemd160|sha512|whirlpool> -c <charset> -m <maxlength>\n"
 		, program_name, program_name);
     fprintf (stream, "\nOptions:\n"
 		" -h --help            			Display this information.\n"
 		" -t --truecrypt <truecrypt_file>  	Truecrypt volume file.\n"
+    	" -k --key <ripemd160 | sha512 | whirlpool>  	Key derivation function (default ripemd160).\n"
 		" -w --wordlist <wordlist_file>  	File of words, for Dictionary attack.\n"
 		" -b --blocksize <parallel_blocks>   	Number of parallel computations, for Dictionary attack (board dependent).\n"
 		" -c --charset <alphabet>		Alphabet to generate the passwords for charset attack.\n"
@@ -66,16 +67,17 @@ int main (int argc, char* argv[])
 {
     int next_option;
     /* A string listing valid short options letters.*/
-    const char* const short_options = "ht:w:c:m:s:b:v";
+    const char* const short_options = "ht:w:c:m:s:b:k:v";
     /* An array describing valid long options. */
     const struct option long_options[] = {
         { "help", 0, NULL, 'h' },
         { "truecrypt",1,NULL, 't'},
         { "wordlist",1, NULL, 'w' },
         { "charset",1, NULL, 'c' },
-	{ "maxlength",1, NULL, 'm' },
-	{ "startlength",1, NULL, 's' },
-	{ "blocksize",1,NULL, 'b' },
+        { "maxlength",1, NULL, 'm' },
+        { "startlength",1, NULL, 's' },
+        { "blocksize",1,NULL, 'b' },
+        { "key",1,NULL, 'k' },
         { "verbose", 0, NULL, 'v' },
         { NULL, 0, NULL, 0 }
         /* Required at end of array.
@@ -97,6 +99,8 @@ int main (int argc, char* argv[])
     int blocksize=0;
     /* Whether to display verbose messages. */
     int verbose = 0;
+    /* Key derivation function. */
+    char *keyDerivationFunction=NULL;
     /* Remember the name of the program, to incorporate in messages.
     The name is stored in argv[0]. */
     program_name = argv[0];
@@ -138,8 +142,13 @@ int main (int argc, char* argv[])
             minlength = atoi(optarg);
             typeAttack=1;
             break;
-	case 'b':
+        case 'b':
             blocksize = atoi(optarg);
+            break;
+        case 'k':
+            /* -k or --key */
+            /* This option takes an argument, the key derivation function.*/
+            keyDerivationFunction = optarg;
             break;
         case 'v':
             verbose = 1;
@@ -170,6 +179,18 @@ int main (int argc, char* argv[])
     else
         print_usage (stdout, 0);
 
+
+    if (keyDerivationFunction==NULL)
+    	CORE_keyDerivationFunction=RIPEMD160;
+    else if (strcasecmp(keyDerivationFunction,"ripemd160")==0)
+    	CORE_keyDerivationFunction=RIPEMD160;
+    else if (strcasecmp(keyDerivationFunction,"sha512")==0)
+        CORE_keyDerivationFunction=SHA512;
+    else if (strcasecmp(keyDerivationFunction,"whirlpool")==0)
+        CORE_keyDerivationFunction=WHIRLPOOL;
+    else
+        print_usage (stdout, 0);
+
     if (typeAttack==0) {
         CORE_typeAttack=ATTACK_DICTIONARY;
         if (wordlist_filename!=NULL)
@@ -182,15 +203,15 @@ int main (int argc, char* argv[])
             CORE_charset=charset;
         else
             print_usage (stdout, 0);
-	if (maxlength>0)
-	    CORE_maxlength=maxlength;
-	 else
-            print_usage (stdout, 0);
-	if (minlength>0)
-	    CORE_minlength=minlength;
-	else
-	    CORE_minlength=1;
-	
+
+		if (maxlength>0)
+			CORE_maxlength=maxlength;
+		 else
+				print_usage (stdout, 0);
+		if (minlength>0)
+			CORE_minlength=minlength;
+		else
+			CORE_minlength=1;
     } else
         print_usage (stdout, 0);
 

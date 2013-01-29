@@ -11,10 +11,17 @@ Main.o
 
 OBJS_CRYPTO =
 
-CFLAGS = -I./Common/ -I./Crypto/ -I./Cuda/ -I./Main/ -I./ -lm -O3
+CFLAGS = -I./Common/ -I./Crypto/ -I./Cuda/ -I./Main/ -I./ 
+LFLAGS = -lm -O3 
+
+if DARWIN
+CFLAGS += -DTC_MACOSX
+else
+CFLAGS += -DTC_UNIX
+endif
 
 if ENABLE_CPU
-OBJS_CRYPTO += Rmd160.o CpuAes.o 
+OBJS_CRYPTO += Rmd160.o CpuAes.o Sha1.o Sha2.o Whirlpool.o
 OBJS_COMMON += Pkcs5.o CpuCore.o
 COMPILER=$(CC)
 else
@@ -35,7 +42,7 @@ endif
 all: truecrack
 
 truecrack:  $(OBJ_CUDA) $(OBJ_MAIN) $(OBJS_COMMON) $(OBJS_CRYPTO) 
-	$(COMPILER) -o $@ $(OBJ_CUDA) $(OBJS_COMMON) $(OBJ_MAIN) $(OBJS_CRYPTO) $(CFLAGS)
+	$(COMPILER) -o $@ $(OBJ_CUDA) $(OBJS_COMMON) $(OBJ_MAIN) $(OBJS_CRYPTO) $(CFLAGS) $(LFLAGS)
 
 $(OBJ_CUDA): 
 	cat Cuda/CudaCore.cu > Cuda.cu 

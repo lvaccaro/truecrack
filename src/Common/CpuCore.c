@@ -31,52 +31,10 @@
 #include "Utils.h"
 #include "Crypto.h"
 
+#include "Core.h"
 #include "CpuCore.h"
 #include "Pkcs5.h"
 #include "CpuAes.h"
-
-
-// Cipher configuration
-static Cipher Ciphers[] =
-{
-//						Block Size	Key Size	Key Schedule Size
-//	  ID		Name			(Bytes)		(Bytes)		(Bytes)
-    { AES,		"AES",			16,			32,			AES_KS				},
-    { 0,		0,				0,			0,			0					}
-};
-
-
-// Encryption algorithm configuration
-// The following modes have been deprecated (legacy): LRW, CBC, INNER_CBC, OUTER_CBC
-static EncryptionAlgorithm EncryptionAlgorithms[] =
-{
-    //  Cipher(s)                     Modes						FormatEnabled
-
-#ifndef TC_WINDOWS_BOOT
-
-    { { 0,						0 }, { 0, 0, 0, 0 },				0 },	// Must be all-zero
-    { { AES,					0 }, { XTS, LRW, CBC, 0 },			1 },
-    { { 0,						0 }, { 0, 0, 0, 0 },				0 }		// Must be all-zero
-
-#else // TC_WINDOWS_BOOT
-
-    // Encryption algorithms available for boot drive encryption
-    { { 0,						0 }, { 0, 0 },		0 },	// Must be all-zero
-    { { AES,					0 }, { XTS, 0 },	1 },
-    { { 0,						0 }, { 0, 0 },		0 },	// Must be all-zero
-
-#endif
-
-};
-
-
-
-// Hash algorithms
-static Hash Hashes[] =
-{	// ID			Name			Deprecated		System Encryption
-    { RIPEMD160,	"RIPEMD-160",	FALSE,			TRUE },
-    { 0, 0, 0 }
-};
 
 enum
 {
@@ -100,7 +58,7 @@ int cpu_GetMaxPkcs5OutSize (void)
     return size;
 }
 
-int cpu_Core_charset(unsigned char *encryptedHeader, unsigned char *CORE_charset, int wordlength,int verbose) {
+int cpu_Core_charset(unsigned char *encryptedHeader, unsigned char *CORE_charset, int wordlength,int verbose, int keyDerivationFunction) {
     // PKCS5 is used to derive the primary header key(s) and secondary header key(s) (XTS mode) from the password
     int i,j,value=-1,found,count;
     unsigned char salt[PKCS5_SALT_SIZE];
@@ -121,9 +79,16 @@ int cpu_Core_charset(unsigned char *encryptedHeader, unsigned char *CORE_charset
 		if (verbose)
 			printf("%d - %d/%d >> %s : ",wordlength,count,maxcombination,word);
 
-		//void derive_key_ripemd160 (char *pwd, int pwd_len, char *salt, int salt_len, int iterations, char *dk, int dklen);
-		derive_key_ripemd160 ( word, wordlength+1, salt, PKCS5_SALT_SIZE, 2000, headerKey, cpu_GetMaxPkcs5OutSize ());
-	
+    	if(keyDerivationFunction==RIPEMD160)
+    		derive_key_ripemd160 ( word, wordlength+1, salt, PKCS5_SALT_SIZE, 2000, headerKey, cpu_GetMaxPkcs5OutSize ());
+    	else if(keyDerivationFunction==SHA512)
+    		derive_key_sha512 (  word, wordlength+1, salt, PKCS5_SALT_SIZE, 2000, headerKey, cpu_GetMaxPkcs5OutSize ());
+    	else if(keyDerivationFunction==WHIRLPOOL)
+    		derive_key_whirlpool (  word, wordlength+1, salt, PKCS5_SALT_SIZE, 2000, headerKey, cpu_GetMaxPkcs5OutSize ());
+    	else{
+    		perror("Key derivation function not supported");
+    		return;
+    	}
 		value=cpu_Xts(encryptedHeader,headerKey,cpu_GetMaxPkcs5OutSize(), masterKey, &length);
 			
 		if (value==SUCCESS) {
@@ -140,18 +105,27 @@ int cpu_Core_charset(unsigned char *encryptedHeader, unsigned char *CORE_charset
 
 
 
-void cpu_Core_dictionary(int blocksize, unsigned char *encryptedHeader, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result) {
+void cpu_Core_dictionary(int blocksize, unsigned char *encryptedHeader, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result, int keyDerivationFunction) {
     // PKCS5 is used to derive the primary header key(s) and secondary header key(s) (XTS mode) from the password
     int i,j,value=-1,found;
     unsigned char salt[PKCS5_SALT_SIZE];
-    unsigned char headerKey[256];
+    unsigned char headerKey[MASTER_KEYDATA_SIZE];
     memcpy (salt, encryptedHeader + HEADER_SALT_OFFSET, PKCS5_SALT_SIZE);
     
      
     found=0;
     for (i=0;i<blocksize && found==0;i++) {
 
-        derive_key_ripemd160 ( blockPwd+blockPwd_init[i], blockPwd_length[i], salt, PKCS5_SALT_SIZE, 2000, headerKey, cpu_GetMaxPkcs5OutSize ());
+    	if(keyDerivationFunction==RIPEMD160)
+    		derive_key_ripemd160 ( blockPwd+blockPwd_init[i], blockPwd_length[i], salt, PKCS5_SALT_SIZE, 2000, headerKey, cpu_GetMaxPkcs5OutSize ());
+    	else if(keyDerivationFunction==SHA512)
+    		derive_key_sha512 ( blockPwd+blockPwd_init[i], blockPwd_length[i], salt, PKCS5_SALT_SIZE, 1000, headerKey, cpu_GetMaxPkcs5OutSize ());
+    	else if(keyDerivationFunction==WHIRLPOOL)
+    		derive_key_whirlpool ( blockPwd+blockPwd_init[i], blockPwd_length[i], salt, PKCS5_SALT_SIZE, 1000, headerKey, cpu_GetMaxPkcs5OutSize ());
+    	else{
+    		perror("Key derivation function not supported");
+    		return;
+    	}
 
         value=cpu_Xts(encryptedHeader,headerKey,cpu_GetMaxPkcs5OutSize(), NULL, NULL);
 

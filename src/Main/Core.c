@@ -207,7 +207,7 @@ void core_dictionary(void) {
         }
 
 
-        cpu_Core_dictionary(1, header, blockPwd, blockPwd_init, blockPwd_length, result);
+        cpu_Core_dictionary(1, header, blockPwd, blockPwd_init, blockPwd_length, result, CORE_keyDerivationFunction);
 	
 	if(result[0]==MATCH)
 		status=1;
@@ -308,7 +308,7 @@ void core_charset(void) {
         // 2.2 Calculate the hash header keys decrypt the encrypted header and check the right header key with cuda procedure
         // PKCS5 is used to derive the primary header key(s) and secondary header key(s) (XTS mode) from the password
     
-	cuda_Core_charset ( strlen(CORE_charset), CORE_charset, wordlength, result) ;	
+	cuda_Core_charset ( strlen(CORE_charset), CORE_charset, wordlength, result) ;
         for (i=0;i<maxcombination && status!=1 ;i++) {
 		if(result[i]==MATCH)
  			status=1;
@@ -391,10 +391,11 @@ void core_charset(void) {
 	unsigned short int wordlength=1;
 	unsigned short int maxcombination=1;
 	CORE_maxlength++;
-
+	int ret=0;
+	
 	for (wordlength=CORE_minlength;wordlength<CORE_maxlength && status==0;wordlength++){
-		i=cpu_Core_charset ( header, CORE_charset, wordlength,CORE_verbose);
-		if (i>0)
+		ret=cpu_Core_charset ( header, CORE_charset, wordlength,CORE_verbose,CORE_keyDerivationFunction);
+		if (ret>0)
 			status=1;
 	}
 	wordlength--;
@@ -413,7 +414,7 @@ void core_charset(void) {
 		maxcombination=1;
 		for (l=0;l<wordlength;l++)
 			maxcombination*=strlen(CORE_charset);
-		computePwd_ (i, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
+		computePwd_ (ret, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
 		word[wordlength]='\0';
 		printf("Found password: \"%s\" of length \"%d\", try \"%d\" words.\n",(char*)word,wordlength,offset);
 	} else {
