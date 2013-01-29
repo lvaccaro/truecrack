@@ -35,6 +35,7 @@ GENCODE_SM20= -gencode arch=compute_20,code=sm_20
 GENCODE_SM30= -gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35
 GENCODE_FLAGS= $(GENCODE_SM10) $(GENCODE_SM20) $(GENCODE_SM30)
 CFLAGS += $(GENCODE_FLAGS) -ftz=true -use_fast_math
+#CFLAGS += -arch=sm_30
 endif
 
 
