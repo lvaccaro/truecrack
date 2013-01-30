@@ -93,7 +93,7 @@ __device__ void cuda_hmac_ripemd160 (unsigned char *key, int keylen, unsigned ch
 }
 
 
-__device__ void cuda_Pbkdf2 ( unsigned char *salt, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, unsigned char *headerkey, int numData, int numBlock) {
+__device__ void cuda_Pbkdf2_ ( unsigned char *salt, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, unsigned char *headerkey, int numData, int numBlock) {
 	SupportPkcs5 support;
 	SupportPkcs5 *sup;
 	sup = &support;
@@ -208,4 +208,355 @@ __device__ void cuda_Pbkdf2_charset_ ( unsigned char *salt, unsigned char *pwd, 
 			}
 		}
 	}
+}
+__device__ void cuda_Pbkdf2 ( unsigned char *salt, unsigned char *pwd, int pwd_len, unsigned char *headerkey) {
+	SupportPkcs5 support;
+	SupportPkcs5 *sup;
+	sup = &support;
+	int numBlock=0;
+	int c, i;
+
+	for(numBlock=0;numBlock<10;numBlock++){
+		//  cuda_Pbkdf2 (salt, blockPwd, blockPwd_init, blockPwd_length, headerkey, numData, i);
+		
+		//INCLUDE: void derive_u_ripemd160 (char *pwd, int pwd_len, char *salt, int salt_len, int iterations, char *u, int b)		
+		int b=numBlock;
+		unsigned char *u=headerkey+RIPEMD160_DIGESTSIZE*b;
+
+		// iteration 1 
+		memset (sup->ccounter, 0, 4);
+		sup->ccounter[3] = (char) b+1;
+		memcpy (sup->cinit, salt, SALT_LENGTH);	// salt 
+		memcpy (&sup->cinit[SALT_LENGTH],sup->ccounter, 4);	// big-endian block number 
+		
+		cuda_hmac_ripemd160 (pwd, pwd_len, sup->cinit, SALT_LENGTH + 4, sup->cj, sup);
+		memcpy (u, sup->cj, RIPEMD160_DIGESTSIZE);
+		
+		//remaining iterations 
+		for (c = 1; c < ITERATIONS; c++)
+		{
+			cuda_hmac_ripemd160 (pwd, pwd_len, sup->cj, RIPEMD160_DIGESTSIZE, sup->ck,sup);
+			for (i = 0; i < RIPEMD160_DIGESTSIZE; i++)
+			{
+				u[i] ^= sup->ck[i];
+				sup->cj[i] = sup->ck[i];
+			}
+		}
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+__device__ void cuda_hmac_truncate
+  (
+	  unsigned char *d1,		/* data to be truncated */
+	  unsigned char *d2,		/* truncated data */
+	  int len		/* length in bytes to keep */
+)
+{
+	int i;
+	for (i = 0; i < len; i++)
+		d2[i] = d1[i];
+}
+
+
+
+
+
+
+__device__ void cuda_hmac_sha512
+(
+	  unsigned char *k,		/* secret key */
+	  int lk,		/* length of the key in bytes */
+	  unsigned char *d,		/* data */
+	  int ld,		/* length of data in bytes */
+	  unsigned char *out,		/* output buffer, at least "t" bytes */
+	  int t
+)
+{
+	sha512_ctx ictx, octx;
+	unsigned char isha[SHA512_DIGESTSIZE], osha[SHA512_DIGESTSIZE];
+	unsigned char key[SHA512_DIGESTSIZE];
+	unsigned char buf[SHA512_BLOCKSIZE];
+	int i;
+
+    /* If the key is longer than the hash algorithm block size,
+	   let key = sha512(key), as per HMAC specifications. */
+	if (lk > SHA512_BLOCKSIZE)
+	{
+		sha512_ctx tctx;
+
+		sha512_begin (&tctx);
+		sha512_hash ((unsigned char *) k, lk, &tctx);
+		sha512_end ((unsigned char *) key, &tctx);
+
+		k = key;
+		lk = SHA512_DIGESTSIZE;
+
+		burn (&tctx, sizeof(tctx));		// Prevent leaks
+	}
+
+	/**** Inner Digest ****/
+
+	sha512_begin (&ictx);
+
+	/* Pad the key for inner digest */
+	for (i = 0; i < lk; ++i)
+		buf[i] = (char) (k[i] ^ 0x36);
+	for (i = lk; i < SHA512_BLOCKSIZE; ++i)
+		buf[i] = 0x36;
+
+	sha512_hash ((unsigned char *) buf, SHA512_BLOCKSIZE, &ictx);
+	sha512_hash ((unsigned char *) d, ld, &ictx);
+
+	sha512_end ((unsigned char *) isha, &ictx);
+
+	/**** Outer Digest ****/
+
+	sha512_begin (&octx);
+
+	for (i = 0; i < lk; ++i)
+		buf[i] = (char) (k[i] ^ 0x5C);
+	for (i = lk; i < SHA512_BLOCKSIZE; ++i)
+		buf[i] = 0x5C;
+
+	sha512_hash ((unsigned char *) buf, SHA512_BLOCKSIZE, &octx);
+	sha512_hash ((unsigned char *) isha, SHA512_DIGESTSIZE, &octx);
+
+	sha512_end ((unsigned char *) osha, &octx);
+
+	/* truncate and print the results */
+	t = t > SHA512_DIGESTSIZE ? SHA512_DIGESTSIZE : t;
+	cuda_hmac_truncate (osha, out, t);
+
+	/* Prevent leaks */
+	burn (&ictx, sizeof(ictx));
+	burn (&octx, sizeof(octx));
+	burn (isha, sizeof(isha));
+	burn (osha, sizeof(osha));
+	burn (buf, sizeof(buf));
+	burn (key, sizeof(key));
+}
+
+
+__device__ void cuda_derive_u_sha512 (unsigned char *pwd, int pwd_len, unsigned char *salt, int salt_len, int iterations, unsigned char *u, int b)
+{
+	unsigned char j[SHA512_DIGESTSIZE], k[SHA512_DIGESTSIZE];
+	unsigned char init[128];
+	unsigned char counter[4];
+	int c, i;
+
+	/* iteration 1 */
+	memset (counter, 0, 4);
+	counter[3] = (char) b;
+	memcpy (init, salt, salt_len);	/* salt */
+	memcpy (&init[salt_len], counter, 4);	/* big-endian block number */
+	cuda_hmac_sha512 (pwd, pwd_len, init, salt_len + 4, j, SHA512_DIGESTSIZE);
+	memcpy (u, j, SHA512_DIGESTSIZE);
+
+	/* remaining iterations */
+	for (c = 1; c < iterations; c++)
+	{
+		cuda_hmac_sha512 (pwd, pwd_len, j, SHA512_DIGESTSIZE, k, SHA512_DIGESTSIZE);
+		for (i = 0; i < SHA512_DIGESTSIZE; i++)
+		{
+			u[i] ^= k[i];
+			j[i] = k[i];
+		}
+	}
+
+	/* Prevent possible leaks. */
+	burn (j, sizeof(j));
+	burn (k, sizeof(k));
+}
+
+
+__device__ void cuda_derive_key_sha512 (unsigned char *pwd, int pwd_len, unsigned char *salt, int salt_len, int iterations, unsigned char *dk, int dklen)
+{
+	unsigned char u[SHA512_DIGESTSIZE];
+	int b, l, r;
+
+	if (dklen % SHA512_DIGESTSIZE)
+	{
+		l = 1 + dklen / SHA512_DIGESTSIZE;
+	}
+	else
+	{
+		l = dklen / SHA512_DIGESTSIZE;
+	}
+
+	r = dklen - (l - 1) * SHA512_DIGESTSIZE;
+
+	/* first l - 1 blocks */
+	for (b = 1; b < l; b++)
+	{
+		cuda_derive_u_sha512 (pwd, pwd_len, salt, salt_len, iterations, u, b);
+		memcpy (dk, u, SHA512_DIGESTSIZE);
+		dk += SHA512_DIGESTSIZE;
+	}
+
+	/* last block */
+	cuda_derive_u_sha512 (pwd, pwd_len, salt, salt_len, iterations, u, b);
+	memcpy (dk, u, r);
+
+
+	/* Prevent possible leaks. */
+	burn (u, sizeof(u));
+}
+
+
+
+
+
+
+
+
+
+__device__ void cuda_hmac_whirlpool
+(
+	  unsigned char *k,		/* secret key */
+	  int lk,		/* length of the key in bytes */
+	  unsigned char *d,		/* data */
+	  int ld,		/* length of data in bytes */
+	  unsigned char *out,	/* output buffer, at least "t" bytes */
+	  int t
+)
+{
+	WHIRLPOOL_CTX ictx, octx;
+	unsigned char iwhi[WHIRLPOOL_DIGESTSIZE], owhi[WHIRLPOOL_DIGESTSIZE];
+	unsigned char key[WHIRLPOOL_DIGESTSIZE];
+	unsigned char buf[WHIRLPOOL_BLOCKSIZE];
+	int i;
+
+    /* If the key is longer than the hash algorithm block size,
+	   let key = whirlpool(key), as per HMAC specifications. */
+	if (lk > WHIRLPOOL_BLOCKSIZE)
+	{
+		WHIRLPOOL_CTX tctx;
+
+		WHIRLPOOL_init (&tctx);
+		WHIRLPOOL_add ((unsigned char *) k, lk * 8, &tctx);
+		WHIRLPOOL_finalize (&tctx, (unsigned char *) key);
+
+		k = key;
+		lk = WHIRLPOOL_DIGESTSIZE;
+
+		burn (&tctx, sizeof(tctx));		// Prevent leaks
+	}
+
+	/**** Inner Digest ****/
+
+	WHIRLPOOL_init (&ictx);
+
+	/* Pad the key for inner digest */
+	for (i = 0; i < lk; ++i)
+		buf[i] = (char) (k[i] ^ 0x36);
+	for (i = lk; i < WHIRLPOOL_BLOCKSIZE; ++i)
+		buf[i] = 0x36;
+
+	WHIRLPOOL_add ((unsigned char *) buf, WHIRLPOOL_BLOCKSIZE * 8, &ictx);
+	WHIRLPOOL_add ((unsigned char *) d, ld * 8, &ictx);
+
+	WHIRLPOOL_finalize (&ictx, (unsigned char *) iwhi);
+
+	/**** Outer Digest ****/
+
+	WHIRLPOOL_init (&octx);
+
+	for (i = 0; i < lk; ++i)
+		buf[i] = (char) (k[i] ^ 0x5C);
+	for (i = lk; i < WHIRLPOOL_BLOCKSIZE; ++i)
+		buf[i] = 0x5C;
+
+	WHIRLPOOL_add ((unsigned char *) buf, WHIRLPOOL_BLOCKSIZE * 8, &octx);
+	WHIRLPOOL_add ((unsigned char *) iwhi, WHIRLPOOL_DIGESTSIZE * 8, &octx);
+
+	WHIRLPOOL_finalize (&octx, (unsigned char *) owhi);
+
+	/* truncate and print the results */
+	t = t > WHIRLPOOL_DIGESTSIZE ? WHIRLPOOL_DIGESTSIZE : t;
+	cuda_hmac_truncate (owhi, out, t);
+
+	/* Prevent possible leaks. */
+	burn (&ictx, sizeof(ictx));
+	burn (&octx, sizeof(octx));
+	burn (owhi, sizeof(owhi));
+	burn (iwhi, sizeof(iwhi));
+	burn (buf, sizeof(buf));
+	burn (key, sizeof(key));
+}
+
+__device__ void cuda_derive_u_whirlpool (unsigned char *pwd, int pwd_len, unsigned char *salt, int salt_len, int iterations, unsigned char *u, int b)
+{
+	unsigned char j[WHIRLPOOL_DIGESTSIZE], k[WHIRLPOOL_DIGESTSIZE];
+	unsigned char init[128];
+	unsigned char counter[4];
+	int c, i;
+
+	/* iteration 1 */
+	memset (counter, 0, 4);
+	counter[3] = (char) b;
+	memcpy (init, salt, salt_len);	/* salt */
+	memcpy (&init[salt_len], counter, 4);	/* big-endian block number */
+	cuda_hmac_whirlpool (pwd, pwd_len, init, salt_len + 4, j, WHIRLPOOL_DIGESTSIZE);
+	memcpy (u, j, WHIRLPOOL_DIGESTSIZE);
+
+	/* remaining iterations */
+	for (c = 1; c < iterations; c++)
+	{
+		cuda_hmac_whirlpool (pwd, pwd_len, j, WHIRLPOOL_DIGESTSIZE, k, WHIRLPOOL_DIGESTSIZE);
+		for (i = 0; i < WHIRLPOOL_DIGESTSIZE; i++)
+		{
+			u[i] ^= k[i];
+			j[i] = k[i];
+		}
+	}
+
+	/* Prevent possible leaks. */
+	burn (j, sizeof(j));
+	burn (k, sizeof(k));
+}
+
+__device__ void cuda_derive_key_whirlpool (unsigned char *pwd, int pwd_len, unsigned char *salt, int salt_len, int iterations, unsigned char *dk, int dklen)
+{
+	unsigned char u[WHIRLPOOL_DIGESTSIZE];
+	int b, l, r;
+
+	if (dklen % WHIRLPOOL_DIGESTSIZE)
+	{
+		l = 1 + dklen / WHIRLPOOL_DIGESTSIZE;
+	}
+	else
+	{
+		l = dklen / WHIRLPOOL_DIGESTSIZE;
+	}
+
+	r = dklen - (l - 1) * WHIRLPOOL_DIGESTSIZE;
+
+	/* first l - 1 blocks */
+	for (b = 1; b < l; b++)
+	{
+		cuda_derive_u_whirlpool (pwd, pwd_len, salt, salt_len, iterations, u, b);
+		memcpy (dk, u, WHIRLPOOL_DIGESTSIZE);
+		dk += WHIRLPOOL_DIGESTSIZE;
+	}
+
+	/* last block */
+	cuda_derive_u_whirlpool (pwd, pwd_len, salt, salt_len, iterations, u, b);
+	memcpy (dk, u, r);
+
+
+	/* Prevent possible leaks. */
+	burn (u, sizeof(u));
 }

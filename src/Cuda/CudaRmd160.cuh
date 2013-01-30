@@ -42,8 +42,10 @@ typedef struct RMD160Context
 } RMD160_CTX;
 
 
-__device__ void cuda_RMD160 (RMD160_CTX *ctx, const unsigned char *input1, unsigned __int32 lenArg1, const unsigned char *input2, unsigned __int32 lenArg2, unsigned char *digest);
-__device__ void cuda_RMD160Transform (unsigned __int32 *digest, const unsigned __int32 *data);
+__device__ void RMD160Init (RMD160_CTX *ctx);
+__device__ void RMD160Transform (unsigned __int32 *state, const unsigned __int32 *data);
+__device__ void RMD160Update (RMD160_CTX *ctx, const unsigned char *input, unsigned __int32 len);
+__device__ void RMD160Final (unsigned char *digest, RMD160_CTX *ctx);
 
 #if defined(__cplusplus)
 }

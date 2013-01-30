@@ -105,7 +105,7 @@ void core_dictionary(void) {
 	}
         // 2.2 Calculate the hash header keys decrypt the encrypted header and check the right header key with cuda procedure
         // PKCS5 is used to derive the primary header key(s) and secondary header key(s) (XTS mode) from the password
-        cuda_Core_dictionary (block_size,blockPwd, blockPwd_init, blockPwd_length, result);
+        cuda_Core_dictionary (block_size,blockPwd, blockPwd_init, blockPwd_length, result, CORE_keyDerivationFunction);
 
 	for (i=0;i<block_size && status!=1 ;i++) {
 		if(result[i]==MATCH)
@@ -308,7 +308,7 @@ void core_charset(void) {
         // 2.2 Calculate the hash header keys decrypt the encrypted header and check the right header key with cuda procedure
         // PKCS5 is used to derive the primary header key(s) and secondary header key(s) (XTS mode) from the password
     
-	cuda_Core_charset ( strlen(CORE_charset), CORE_charset, wordlength, result) ;
+	cuda_Core_charset ( strlen(CORE_charset), CORE_charset, wordlength, result, CORE_keyDerivationFunction) ;
         for (i=0;i<maxcombination && status!=1 ;i++) {
 		if(result[i]==MATCH)
  			status=1;

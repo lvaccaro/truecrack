@@ -11,13 +11,14 @@ Main.o
 
 OBJS_CRYPTO =
 
-CFLAGS = -I./Common/ -I./Crypto/ -I./Cuda/ -I./Main/ -I./ 
+CFLAGS = -g -I./Common/ -I./Crypto/ -I./Cuda/ -I./Main/ -I./ -I/usr/local/cuda-5.0/include/ 
 LFLAGS = -lm -O3 
 
 if DARWIN
 CFLAGS += -DTC_MACOSX
 else
-CFLAGS += -DTC_UNIX
+CFLAGS += 
+#-DTC_UNIX
 endif
 
 if ENABLE_CPU
@@ -34,7 +35,8 @@ GENCODE_SM10= -gencode arch=compute_10,code=sm_10
 GENCODE_SM20= -gencode arch=compute_20,code=sm_20
 GENCODE_SM30= -gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35
 GENCODE_FLAGS= $(GENCODE_SM10) $(GENCODE_SM20) $(GENCODE_SM30)
-CFLAGS += $(GENCODE_FLAGS) -ftz=true -use_fast_math
+#CFLAGS += $(GENCODE_FLAGS) -ftz=true -use_fast_math
+CFLAGS += -arch=sm_10 
 #CFLAGS += -arch=sm_30
 endif
 
@@ -48,7 +50,9 @@ truecrack:  $(OBJ_CUDA) $(OBJ_MAIN) $(OBJS_COMMON) $(OBJS_CRYPTO)
 $(OBJ_CUDA): 
 	cat Cuda/CudaCore.cu > Cuda.cu 
 	cat Cuda/CudaPkcs5.cu >> Cuda.cu
-	cat Cuda/CudaRmd160.cu >> Cuda.cu
+	cat Cuda/cuRmd160.cu >> Cuda.cu
+	cat Cuda/cuSha2.cu >> Cuda.cu
+	cat Cuda/cuWhirlpool.cu >> Cuda.cu
 	cat Cuda/CudaAes.cu >> Cuda.cu
 	cat Cuda/CudaXts.cu >> Cuda.cu
 	$(COMPILER) -c Cuda.cu $(CFLAGS) --opencc-options -OPT:Olimit=0 $< -o $@
