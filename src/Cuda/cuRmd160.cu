@@ -31,7 +31,7 @@
 #include <memory.h>
 #include "Tcdefs.h"
 #include "Endian.h"
-#include "CudaRmd160.cuh"
+#include "cuRmd160.cuh"
 
 #define F(x, y, z)    (x ^ y ^ z) 
 #define G(x, y, z)    (z ^ (x & (y^z)))
