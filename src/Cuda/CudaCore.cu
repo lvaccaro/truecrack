@@ -74,37 +74,6 @@ __device__ void computePwd (uint64_t number, uint64_t maxcombination, int charse
 	word[i]=charset[word[i]];
 	
 }
-__device__ void cuda_Pbkdf2_charset ( unsigned char *salt, unsigned char *pwd, int pwd_len, unsigned char *headerkey, int numBlock) {
-	SupportPkcs5 support;
-	SupportPkcs5 *sup;
-	sup = &support;
-	
-	//INCLUDE: void derive_u_ripemd160 (char *pwd, int pwd_len, char *salt, int salt_len, int iterations, char *u, int b)
-
-	int c, i;	
-	int b=numBlock;
-	unsigned char *u=headerkey+RIPEMD160_DIGESTSIZE*b;
-
-	// iteration 1 
-	memset (sup->ccounter, 0, 4);
-	sup->ccounter[3] = (char) b;
-	memcpy (sup->cinit, salt, SALT_LENGTH);	// salt 
-	memcpy (&sup->cinit[SALT_LENGTH],sup->ccounter, 4);	// big-endian block number 
-	
-	cuda_hmac_ripemd160 (pwd, pwd_len, sup->cinit, SALT_LENGTH + 4, sup->cj, sup);
-	memcpy (u, sup->cj, RIPEMD160_DIGESTSIZE);
-	
-	//remaining iterations 
-	for (c = 1; c < ITERATIONS; c++)
-	{
-		cuda_hmac_ripemd160 (pwd, pwd_len, sup->cj, RIPEMD160_DIGESTSIZE, sup->ck,sup);
-		for (i = 0; i < RIPEMD160_DIGESTSIZE; i++)
-		{
-			u[i] ^= sup->ck[i];
-			sup->cj[i] = sup->ck[i];
-		}
-	}
-}
 
  __global__ void cuda_Kernel_charset (
     	unsigned char *salt,
@@ -113,7 +82,8 @@ __device__ void cuda_Pbkdf2_charset ( unsigned char *salt, unsigned char *pwd, i
     	unsigned char *charset,
     	unsigned short int password_length,
     	uint64_t maxcombination,
-    	 short int *result)
+    	 short int *result, 
+	 int keyDerivationFunction)
  {
 	uint64_t numData = blockIdx.x*blockDim.x+threadIdx.x;
 	__align__(8) unsigned char headerkey[192];
@@ -125,7 +95,7 @@ __device__ void cuda_Pbkdf2_charset ( unsigned char *salt, unsigned char *pwd, i
 	pwd[password_length]='\0';
 	
 	//__device__ void cuda_Pbkdf2_charset_ ( unsigned char *salt, unsigned char *pwd, int pwd_len, unsigned char *headerkey) {
-	cuda_Pbkdf2_charset_ ( salt, pwd, password_length, headerkey);
+//	cuda_Pbkdf2 ( salt, pwd, password_length, headerkey);
 
 	int value=cuda_Xts (headerEncrypted, headerkey, headerDecrypted);
 	if (value==SUCCESS)
@@ -134,24 +104,33 @@ __device__ void cuda_Pbkdf2_charset ( unsigned char *salt, unsigned char *pwd, i
 		result[numData]=NOMATCH;
 }
 
-__global__ void cuda_Kernel ( unsigned char *salt, unsigned char *headerEncrypted, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result, int max) {
+	
+__global__ void cuda_Kernel ( unsigned char *salt, unsigned char *headerEncrypted, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result, int max, int keyDerivationFunction) {
 	int value;
 	int numData=blockIdx.x*NUMTHREADSXBLOCK+threadIdx.x;
 
 	if (numData>=max) return;
 
 	// Array of unsigned char in the shared memory
-	__align__(8) unsigned char headerkey[192];
+	__align__(8) unsigned char headerKey[192];
 	__align__(8) unsigned char headerDecrypted[512];
 
 	// Calculate the hash header key
-	int i=0;
-	for (i=0;i<10;i++)
-		cuda_Pbkdf2 (salt, blockPwd, blockPwd_init, blockPwd_length, headerkey, numData,i);
+	unsigned char *pwd=blockPwd+blockPwd_init[numData];
+	int pwd_len = blockPwd_length[numData];
 
 
+	if(keyDerivationFunction==RIPEMD160)
+		cuda_Pbkdf2 ( salt, pwd, pwd_len, headerKey);
+	else if(keyDerivationFunction==SHA512)
+		cuda_derive_key_sha512 (  pwd, pwd_len, salt, PKCS5_SALT_SIZE, 1000, headerKey, 64);
+	else if(keyDerivationFunction==WHIRLPOOL)
+		cuda_derive_key_whirlpool (  pwd, pwd_len, salt, PKCS5_SALT_SIZE, 1000, headerKey, 64);
+	else
+		;
+	
 	// Decrypt the header and compare the key
-	value=cuda_Xts (headerEncrypted, headerkey,headerDecrypted);
+	value=cuda_Xts (headerEncrypted, headerKey,headerDecrypted);
 
 	if (value==SUCCESS)
 		result[numData]=MATCH;
@@ -159,35 +138,7 @@ __global__ void cuda_Kernel ( unsigned char *salt, unsigned char *headerEncrypte
 		result[numData]=NOMATCH;
 }
 
-/*
-__global__ void cuda_Kernel ( unsigned char *salt, unsigned char *headerEncrypted, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result, int max) {
-	int value;
-	int numData=blockIdx.x;//threadIdx.x;
 
-	if (numData>=max) return;
-
-	// Array of unsigned char in the shared memory
-	__shared__ __align__(8) unsigned char headerkey[192];
-	__shared__ __align__(8) unsigned char headerDecrypted[512];
-
-	// Calculate the hash header key
-	int i=0;
-	//for (i=0;i<10;i++)
-		cuda_Pbkdf2 (salt, blockPwd, blockPwd_init, blockPwd_length, headerkey, blockIdx.x,threadIdx.x);
-
-	__syncthreads();
-
-if(threadIdx.x==0){
-	// Decrypt the header and compare the key
-	value=cuda_Xts (headerEncrypted, headerkey,headerDecrypted);
-
-	if (value==SUCCESS)
-		result[numData]=MATCH;
-	else
-		result[numData]=NOMATCH;
-}
-}
-*/
 /*
 void cuda_Core ( int block_currentsize, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result) {	
 	cudaStream_t stream[2];
@@ -281,7 +232,7 @@ int j;
 }
 */
 
-void cuda_Core_dictionary ( int block_currentsize, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result) {
+void cuda_Core_dictionary ( int block_currentsize, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result, int keyDerivationFunction) {
 
 	int lengthpwd=0;
 	for (int j=0;j<block_currentsize;j++) {
@@ -299,7 +250,7 @@ void cuda_Core_dictionary ( int block_currentsize, unsigned char *blockPwd, int 
 	if (block_currentsize<NUMTHREADSXBLOCK)
 		numThread=block_currentsize;
 
-	cuda_Kernel<<<numBlocks,numThread>>>(dev_salt, dev_header, dev_blockPwd, dev_blockPwd_init, dev_blockPwd_length, dev_result,block_currentsize);
+	cuda_Kernel<<<numBlocks,numThread>>>(dev_salt, dev_header, dev_blockPwd, dev_blockPwd_init, dev_blockPwd_length, dev_result,block_currentsize,keyDerivationFunction);
 
 	cudaError_t err=cudaMemcpy(result, dev_result,block_currentsize* sizeof(short int) , cudaMemcpyDeviceToHost) ;
 	if (err!=cudaSuccess){
@@ -308,7 +259,7 @@ void cuda_Core_dictionary ( int block_currentsize, unsigned char *blockPwd, int 
 	cudaFree(dev_result);
 }
 
-void cuda_Core_charset ( unsigned short int charset_length, unsigned char *charset, unsigned short int password_length, short int *result) 
+void cuda_Core_charset ( unsigned short int charset_length, unsigned char *charset, unsigned short int password_length, short int *result, int keyDerivationFunction) 
 {
 	uint64_t maxcombination=1;
 	for (int i=0;i<password_length;i++)
@@ -325,7 +276,7 @@ void cuda_Core_charset ( unsigned short int charset_length, unsigned char *chars
 	if (maxcombination<NUMTHREADSXBLOCK)
 		numThread=maxcombination;
 
-	cuda_Kernel_charset<<<numBlocks,numThread>>>(dev_salt, dev_header, charset_length, dev_charset, password_length, maxcombination,dev_result);
+	cuda_Kernel_charset<<<numBlocks,numThread>>>(dev_salt, dev_header, charset_length, dev_charset, password_length, maxcombination,dev_result, keyDerivationFunction);
 	
 	// Copy the device result vector in device memory to the host result vector in host memory.
 	HANDLE_ERROR( cudaMemcpy(result, dev_result, maxcombination*sizeof(short int), cudaMemcpyDeviceToHost));
