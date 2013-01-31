@@ -40,7 +40,8 @@ host_triplet = @host@
 @ENABLE_CPU_TRUE@am__append_3 = Rmd160.o CpuAes.o Sha1.o Sha2.o Whirlpool.o
 @ENABLE_CPU_TRUE@am__append_4 = Pkcs5.o CpuCore.o
 #CFLAGS += $(GENCODE_FLAGS) -ftz=true -use_fast_math
-@ENABLE_CPU_FALSE@am__append_5 = -D_GPU_ -arch=sm_10
+#CFLAGS += -arch=sm_10 
+@ENABLE_CPU_FALSE@am__append_5 = -D_GPU_ -arch=sm_30
 @ENABLE_CPU_FALSE@am__append_6 = #gpuCrypto.o
 bin_PROGRAMS = truecrack$(EXEEXT)
 subdir = src
@@ -413,7 +414,6 @@ uninstall-am: uninstall-binPROGRAMS
 	mostlyclean mostlyclean-compile mostlyclean-generic pdf pdf-am \
 	ps ps-am uninstall uninstall-am uninstall-binPROGRAMS
 
-#CFLAGS += -arch=sm_30
 
 all: truecrack
 

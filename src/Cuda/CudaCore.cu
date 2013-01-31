@@ -104,7 +104,7 @@ __device__ void computePwd (uint64_t number, uint64_t maxcombination, int charse
 		result[numData]=NOMATCH;
 }
 
-	
+/*	
 __global__ void cuda_Kernel ( unsigned char *salt, unsigned char *headerEncrypted, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result, int max, int keyDerivationFunction) {
 	int value;
 	int numData=blockIdx.x*NUMTHREADSXBLOCK+threadIdx.x;
@@ -137,6 +137,80 @@ __global__ void cuda_Kernel ( unsigned char *salt, unsigned char *headerEncrypte
 	else
 		result[numData]=NOMATCH;
 }
+*/
+__global__ void cuda_Kernel_dictionary_ripemd160 ( unsigned char *salt, unsigned char *headerEncrypted, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result, int max) {
+	int value;
+	int numData=blockIdx.x*NUMTHREADSXBLOCK+threadIdx.x;
+
+	if (numData>=max) return;
+
+	// Array of unsigned char in the shared memory
+	__align__(8) unsigned char headerKey[192];
+	__align__(8) unsigned char headerDecrypted[512];
+
+	// Calculate the hash header key
+	unsigned char *pwd=blockPwd+blockPwd_init[numData];
+	int pwd_len = blockPwd_length[numData];
+	cuda_derive_key_sha512 (  pwd, pwd_len, salt, PKCS5_SALT_SIZE, 1000, headerKey, 64);
+
+	// Decrypt the header and compare the key
+	value=cuda_Xts (headerEncrypted, headerKey,headerDecrypted);
+
+	if (value==SUCCESS)
+		result[numData]=MATCH;
+	else
+		result[numData]=NOMATCH;
+}
+
+
+__global__ void cuda_Kernel_dictionary_sha512 ( unsigned char *salt, unsigned char *headerEncrypted, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result, int max) {
+	int value;
+	int numData=blockIdx.x*NUMTHREADSXBLOCK+threadIdx.x;
+
+	if (numData>=max) return;
+
+	// Array of unsigned char in the shared memory
+	__align__(8) unsigned char headerKey[192];
+	__align__(8) unsigned char headerDecrypted[512];
+
+	// Calculate the hash header key
+	unsigned char *pwd=blockPwd+blockPwd_init[numData];
+	int pwd_len = blockPwd_length[numData];
+	cuda_Pbkdf2 ( salt, pwd, pwd_len, headerKey);
+	
+	// Decrypt the header and compare the key
+	value=cuda_Xts (headerEncrypted, headerKey,headerDecrypted);
+
+	if (value==SUCCESS)
+		result[numData]=MATCH;
+	else
+		result[numData]=NOMATCH;
+}
+
+__global__ void cuda_Kernel_dictionary_whirlpool ( unsigned char *salt, unsigned char *headerEncrypted, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result, int max) {
+        int value;
+        int numData=blockIdx.x*NUMTHREADSXBLOCK+threadIdx.x;
+
+        if (numData>=max) return;
+
+        // Array of unsigned char in the shared memory
+        __align__(8) unsigned char headerKey[192];
+        __align__(8) unsigned char headerDecrypted[512];
+
+        // Calculate the hash header key
+        unsigned char *pwd=blockPwd+blockPwd_init[numData];
+        int pwd_len = blockPwd_length[numData];
+        cuda_derive_key_whirlpool (  pwd, pwd_len, salt, PKCS5_SALT_SIZE, 1000, headerKey, 64);
+
+        // Decrypt the header and compare the key
+        value=cuda_Xts (headerEncrypted, headerKey,headerDecrypted);
+
+        if (value==SUCCESS)
+                result[numData]=MATCH;
+        else
+                result[numData]=NOMATCH;
+}
+
 
 
 /*
@@ -250,7 +324,14 @@ void cuda_Core_dictionary ( int block_currentsize, unsigned char *blockPwd, int 
 	if (block_currentsize<NUMTHREADSXBLOCK)
 		numThread=block_currentsize;
 
-	cuda_Kernel<<<numBlocks,numThread>>>(dev_salt, dev_header, dev_blockPwd, dev_blockPwd_init, dev_blockPwd_length, dev_result,block_currentsize,keyDerivationFunction);
+        if(keyDerivationFunction==RIPEMD160)
+               cuda_Kernel_dictionary_ripemd160 <<<numBlocks,numThread>>>(dev_salt, dev_header, dev_blockPwd, dev_blockPwd_init, dev_blockPwd_length, dev_result,block_currentsize);
+        else if(keyDerivationFunction==SHA512)
+	        cuda_Kernel_dictionary_sha512 <<<numBlocks,numThread>>>(dev_salt, dev_header, dev_blockPwd, dev_blockPwd_init, dev_blockPwd_length, dev_result,block_currentsize);
+	else if(keyDerivationFunction==WHIRLPOOL)
+        	cuda_Kernel_dictionary_whirlpool <<<numBlocks,numThread>>>(dev_salt, dev_header, dev_blockPwd, dev_blockPwd_init, dev_blockPwd_length, dev_result,block_currentsize);
+	else
+                ;
 
 	cudaError_t err=cudaMemcpy(result, dev_result,block_currentsize* sizeof(short int) , cudaMemcpyDeviceToHost) ;
 	if (err!=cudaSuccess){
