@@ -151,7 +151,7 @@ __global__ void cuda_Kernel_dictionary_ripemd160 ( unsigned char *salt, unsigned
 	// Calculate the hash header key
 	unsigned char *pwd=blockPwd+blockPwd_init[numData];
 	int pwd_len = blockPwd_length[numData];
-	cuda_derive_key_sha512 (  pwd, pwd_len, salt, PKCS5_SALT_SIZE, 1000, headerKey, 64);
+	cuda_Pbkdf2 ( salt, pwd, pwd_len, headerKey);
 
 	// Decrypt the header and compare the key
 	value=cuda_Xts (headerEncrypted, headerKey,headerDecrypted);
@@ -176,7 +176,7 @@ __global__ void cuda_Kernel_dictionary_sha512 ( unsigned char *salt, unsigned ch
 	// Calculate the hash header key
 	unsigned char *pwd=blockPwd+blockPwd_init[numData];
 	int pwd_len = blockPwd_length[numData];
-	cuda_Pbkdf2 ( salt, pwd, pwd_len, headerKey);
+	cuda_derive_key_sha512 (  pwd, pwd_len, salt, PKCS5_SALT_SIZE, 1000, headerKey, 64);
 	
 	// Decrypt the header and compare the key
 	value=cuda_Xts (headerEncrypted, headerKey,headerDecrypted);
