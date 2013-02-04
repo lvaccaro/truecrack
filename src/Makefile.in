@@ -56,7 +56,15 @@ host_triplet = @host@
 #-DTC_UNIX
 @ENABLE_CPU_TRUE@am__append_3 = Rmd160.o CpuAes.o Sha1.o Sha2.o Whirlpool.o
 @ENABLE_CPU_TRUE@am__append_4 = Pkcs5.o CpuCore.o
-@ENABLE_CPU_FALSE@am__append_5 = -D_GPU_
+# CUDA code generation flags
+#GENCODE_SM10= -gencode arch=compute_10,code=sm_10
+#GENCODE_SM20= -gencode arch=compute_20,code=sm_20
+#GENCODE_SM30= -gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35
+#GENCODE_FLAGS= $(GENCODE_SM10) $(GENCODE_SM20) $(GENCODE_SM30)
+#CFLAGS += $(GENCODE_FLAGS) -ftz=true -use_fast_math
+#CFLAGS += -arch=sm_11 
+#CFLAGS += -arch=sm_30
+@ENABLE_CPU_FALSE@am__append_5 = -D_GPU_ -ftz=true -use_fast_math
 @ENABLE_CPU_FALSE@am__append_6 = #gpuCrypto.o
 bin_PROGRAMS = truecrack$(EXEEXT)
 subdir = src
@@ -437,14 +445,6 @@ uninstall-am: uninstall-binPROGRAMS
 	mostlyclean mostlyclean-compile mostlyclean-generic pdf pdf-am \
 	ps ps-am uninstall uninstall-am uninstall-binPROGRAMS
 
-# CUDA code generation flags
-#GENCODE_SM10= -gencode arch=compute_10,code=sm_10
-#GENCODE_SM20= -gencode arch=compute_20,code=sm_20
-#GENCODE_SM30= -gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35
-#GENCODE_FLAGS= $(GENCODE_SM10) $(GENCODE_SM20) $(GENCODE_SM30)
-#CFLAGS += $(GENCODE_FLAGS) -ftz=true -use_fast_math
-#CFLAGS += -arch=sm_11 
-#CFLAGS += -arch=sm_30
 
 all: truecrack
 

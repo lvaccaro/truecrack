@@ -38,6 +38,7 @@ COMPILER=$(NVCC)
 #CFLAGS += $(GENCODE_FLAGS) -ftz=true -use_fast_math
 #CFLAGS += -arch=sm_11 
 #CFLAGS += -arch=sm_30
+CFLAGS += -ftz=true -use_fast_math
 endif
 
 
