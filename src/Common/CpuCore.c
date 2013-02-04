@@ -81,7 +81,8 @@ int cpu_Core_charset(unsigned char *encryptedHeader, unsigned char *CORE_charset
 		word[wordlength]='\0';
 	
 		if (verbose){
-			printf("%d - %d/ %lu >> ",wordlength,count,maxcombination);
+			printf("%d - %d/",wordlength,count);
+			printf("%lu >> ",maxcombination);
 			 for (i=0;i<wordlength;i++)
 				printf("%c",word[i]);
 			 printf(" : ");
