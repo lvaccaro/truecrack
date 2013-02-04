@@ -90,6 +90,9 @@ void core_dictionary(void) {
      * a block is implement how a single array of sequentially words; there are also provide
      * support vector init and length for each words.
      */
+    	if (CORE_verbose)
+		printf ( "\nCOUNT >> PWD : RESULT\n" );
+	
     while ( status!=1 ) {
 
         // 2.1 Fill the BlockPwd of passwords and detect the new dimension block.
@@ -191,6 +194,8 @@ void core_dictionary(void) {
      * a block is implement how a single array of sequentially words; there are also provide
      * support vector init and length for each words.
      */
+    	if (CORE_verbose)
+		printf ( "\nCOUNT >> PWD : RESULT\n" );
     while ( status!=1 ) {
 
         // 2.1 Fill the BlockPwd of passwords and detect the new dimension block.
@@ -278,6 +283,9 @@ void core_charset(void) {
     uint64_t maxcombination=1;
     CORE_maxlength++;
 
+    if (CORE_verbose)
+		printf ( "\nPWDSIZE - COMBINATION/MAXCOMBINATION >> PWD : RESULT\n" );
+	
     for ( wordlength=CORE_minlength; wordlength <  CORE_maxlength && status==0; wordlength++) {
       maxcombination=1;
 	for (i=0;i<wordlength;i++)
@@ -376,6 +384,8 @@ void core_charset(void) {
 	CORE_maxlength++;
 	int ret=0;
 	
+	if (CORE_verbose)
+		printf ( "\nPWDSIZE - COMBINATION/MAXCOMBINATION >> PWD : RESULT\n" );
 	
 	for (wordlength=CORE_minlength;wordlength<CORE_maxlength && status==0;wordlength++){
 	  	ret=cpu_Core_charset ( header, CORE_charset, wordlength,CORE_verbose,CORE_keyDerivationFunction);
