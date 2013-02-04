@@ -61,6 +61,22 @@ FILE *file_open (char *wordPath) {
 
 }
 
+void computePwd (uint64_t number, uint64_t maxcombination, uint8_t charsetlength, unsigned char *charset, uint8_t wordlength, unsigned char *word){
+    uint8_t i=0;
+    if (number>=maxcombination) return;
+    for (i=0;i<wordlength;i++)
+        word[i]=0;
+    i=0;
+    while(number>0){
+        word[i]=number%charsetlength;
+        number=(number-word[i])/charsetlength;
+        i++;
+    }
+    for (i=0;i<wordlength;i++)
+        word[i]=charset[word[i]];
+}
+
+
 int file_close (FILE *fp) {
     fclose(fp);
     return 1;

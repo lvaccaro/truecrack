@@ -251,23 +251,6 @@ void core_dictionary(void) {
 #endif
 
 
-
-void computePwd_ (int number, int maxcombination, int charsetlength, unsigned char *charset, int wordlength, unsigned char *word){
-    unsigned short i=0;
-    if (number>=maxcombination) return;
-    for (i=0;i<wordlength;i++)
-        word[i]=0;
-    i=0;
-    while(number>0){
-        word[i]=number%charsetlength;
-        number=(number-word[i])/charsetlength;
-        i++;
-    }
-    for (i=0;i<wordlength;i++)
-        word[i]=charset[word[i]];
-}
-
-
 #ifdef _GPU_
 void core_charset(void) {
 
@@ -315,7 +298,7 @@ void core_charset(void) {
 	} 
         if (CORE_verbose) {
 		for (j=0;j<maxcombination;j++) {
-			computePwd_ (j, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
+			computePwd (j, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
 			word[wordlength]='\0';		
 			/*printf("maxcombination=%d\n",maxcombination);
 			printf("j=%d\n",j);
@@ -358,7 +341,7 @@ void core_charset(void) {
 		maxcombination=1;
 		for (l=0;l<wordlength;l++)
 			maxcombination*=strlen(CORE_charset);
-		computePwd_ (i, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
+		computePwd (i, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
 		word[wordlength]='\0';
 		offset+=i;
 		printf("Found password: \"%s\" of length \"%d\", try \"%d\" words.\n",(char*)word,wordlength,offset);
@@ -393,8 +376,9 @@ void core_charset(void) {
 	CORE_maxlength++;
 	int ret=0;
 	
+	
 	for (wordlength=CORE_minlength;wordlength<CORE_maxlength && status==0;wordlength++){
-		ret=cpu_Core_charset ( header, CORE_charset, wordlength,CORE_verbose,CORE_keyDerivationFunction);
+	  	ret=cpu_Core_charset ( header, CORE_charset, wordlength,CORE_verbose,CORE_keyDerivationFunction);
 		if (ret>0)
 			status=1;
 	}
@@ -414,7 +398,7 @@ void core_charset(void) {
 		maxcombination=1;
 		for (l=0;l<wordlength;l++)
 			maxcombination*=strlen(CORE_charset);
-		computePwd_ (ret, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
+		computePwd (ret, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
 		word[wordlength]='\0';
 		printf("Found password: \"%s\" of length \"%d\", try \"%d\" words.\n",(char*)word,wordlength,offset);
 	} else {
