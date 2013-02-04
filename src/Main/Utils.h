@@ -20,6 +20,8 @@
 #define HEADER_Utils
 
 #include <stdio.h>
+#include <sys/types.h>
+#include "Tcdefs.h"
 
 #define MAXWORDSIZE	64
 
@@ -29,6 +31,8 @@ int file_readWordsBlock (FILE *fp, int block_size, char *words, int *words_init,
 int file_readHeader(char *volumePath, char *header);
 
 //int readWords(char *wordPath, char *words[]);
+
+void computePwd (uint64_t number, uint64_t maxcombination, uint8_t charsetlength, unsigned char *charset, uint8_t wordlength, unsigned char *word);
 
 
 void cuda_initHeaderKey (char *encryptedHeader, int block_size ) ;

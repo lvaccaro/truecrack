@@ -58,9 +58,12 @@ int cpu_GetMaxPkcs5OutSize (void)
     return size;
 }
 
+
+
+
 int cpu_Core_charset(unsigned char *encryptedHeader, unsigned char *CORE_charset, int wordlength,int verbose, int keyDerivationFunction) {
     // PKCS5 is used to derive the primary header key(s) and secondary header key(s) (XTS mode) from the password
-    int i,j,value=-1,found,count;
+    int i,j,value=-1,found;
     unsigned char salt[PKCS5_SALT_SIZE];
     unsigned char headerKey[256]={0};
     unsigned char masterKey[256]={0};
@@ -68,17 +71,22 @@ int cpu_Core_charset(unsigned char *encryptedHeader, unsigned char *CORE_charset
     unsigned char word[MAXWORDSIZE];
     memcpy (salt, encryptedHeader + HEADER_SALT_OFFSET, PKCS5_SALT_SIZE);
     
-    int maxcombination=1;
+    uint64 maxcombination=1,count=0;
     for (i=0;i<wordlength;i++)
        maxcombination*= strlen(CORE_charset);
     
-    for (count=0;count<maxcombination;count++){
-		computePwd_ (count, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
-		word[wordlength]='\0';
-		
-		if (verbose)
-			printf("%d - %d/%d >> %s : ",wordlength,count,maxcombination,word);
 
+    for (count=0;count<maxcombination;count++){
+		computePwd (count, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
+		word[wordlength]='\0';
+	
+		if (verbose){
+			printf("%d - %d/%llu >> ",wordlength,count,maxcombination);
+			 for (i=0;i<wordlength;i++)
+				printf("%c",word[i]);
+			 printf(" : ");
+		}
+ 
     	if(keyDerivationFunction==RIPEMD160)
     		derive_key_ripemd160 ( word, wordlength+1, salt, PKCS5_SALT_SIZE, 2000, headerKey, cpu_GetMaxPkcs5OutSize ());
     	else if(keyDerivationFunction==SHA512)
@@ -89,6 +97,9 @@ int cpu_Core_charset(unsigned char *encryptedHeader, unsigned char *CORE_charset
     		perror("Key derivation function not supported");
     		return;
     	}
+    		   
+    
+    
 		value=cpu_Xts(encryptedHeader,headerKey,cpu_GetMaxPkcs5OutSize(), masterKey, &length);
 			
 		if (value==SUCCESS) {
