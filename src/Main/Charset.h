@@ -20,10 +20,12 @@
 #define HEADER_Charset
 
 /*La funzione numberOfStrings dice di quante parole è composta la permutazione completa di n caratteri in alfabeto per stringhe lunghe da 1 a n caratteri (è di supporto).*/
-unsigned long numberOfStrings(const int alphLength, const int stringLength);
+unsigned long numberOfStrings(const int alphLength, const int stringMinLength, const int stringMaxLength);
 
 /*La funzione indexedWordFromAlphabet da la i-esima parola dell’elenco delle permutazioni di n caratteri in alfabeto per stringhe da 1 a n caratteri di lunghezza massima.
 */
-char* indexedWordFromAlphabet (unsigned long idx, const char* alphCharset, const int alphLength, const int maxWordLength);
+char* indexedWordFromAlphabet (unsigned long idx, const char* alphCharset, const int alphLength, const int minWordLength, const int maxWordLength) ;
+
+int charset_readWordsBlock (int block_size, char *alphabet, int minlength, int maxlength,char *words, int *words_init, int *words_length) ;
 
 #endif

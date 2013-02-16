@@ -69,8 +69,12 @@
 */
 
 #include "Common/Endian.h"
+#ifndef PLATFORM_BYTE_ORDER
 #define PLATFORM_BYTE_ORDER BYTE_ORDER
+#endif
+#ifndef IS_LITTLE_ENDIAN
 #define IS_LITTLE_ENDIAN LITTLE_ENDIAN
+#endif
 
 #if 0
 #define UNROLL_SHA2     /* for SHA2 loop unroll     */

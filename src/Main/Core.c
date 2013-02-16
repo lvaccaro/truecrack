@@ -53,6 +53,8 @@ void core(void){
 		core_charset();
 	else 
 	  printf("Select an invalid operation mode\n");
+
+  
 }
 
 
@@ -67,7 +69,6 @@ void core_dictionary(void) {
 
     /* 1. Init procedure  */
     // Retrieve block size dimension
-
    if (CORE_blocksize==0) 
 	CORE_blocksize=1024;//getMultiprocessorCount();
    
@@ -75,8 +76,9 @@ void core_dictionary(void) {
     blockPwd=malloc(CORE_blocksize*PASSWORD_MAXSIZE*sizeof(char));
     blockPwd_init=malloc(CORE_blocksize*sizeof(int));
     blockPwd_length=malloc(CORE_blocksize*sizeof(int));
-   // Open file of passwords
-    fp_words=file_open(CORE_wordsPath);
+    result=malloc(CORE_blocksize*sizeof(short int));	
+    // Open file of passwords
+	  fp_words=file_open(CORE_wordsPath);
     // Read in volume header
     header_length = file_readHeader(CORE_volumePath,header);
     // Allocation and initialization memory of constant structures for cuda procedure
@@ -98,14 +100,9 @@ void core_dictionary(void) {
         // 2.1 Fill the BlockPwd of passwords and detect the new dimension block.
         // The size of block can change to the number of the read words when the read function go to the end of file.
         block_size=file_readWordsBlock(fp_words, CORE_blocksize,blockPwd,blockPwd_init,blockPwd_length);
-        if (block_size==0)
+	if (block_size==0)
             break;
 
- 	result=malloc(block_size*sizeof(short int));	
-	if (result==NULL){
-		perror("Memory could not be allocated. ");
-		exit( EXIT_FAILURE );
-	}
         // 2.2 Calculate the hash header keys decrypt the encrypted header and check the right header key with cuda procedure
         // PKCS5 is used to derive the primary header key(s) and secondary header key(s) (XTS mode) from the password
         cuda_Core_dictionary (block_size,blockPwd, blockPwd_init, blockPwd_length, result, CORE_keyDerivationFunction);
@@ -134,33 +131,32 @@ void core_dictionary(void) {
 		}
             }
         }
-	free(result);
         iblock++;
     }
     iblock--;
     i--;
 
     /* 3. Close procedure */
-    file_close(fp_words);
+      file_close(fp_words);
 
     /* 4. Print output message*/
-    uint64_t offset=iblock*CORE_blocksize+i;
+    uint64_t offset=iblock*CORE_blocksize+i+1;
     if (status==1) {
         // Retrieve the master key from last block
         int j;
-	offset+=i;
         printf("Found password: \"");
 	for (j=0;j<blockPwd_length[i];j++)
             printf("%c",blockPwd[blockPwd_init[i]+j]);
-        printf("\" of length \"%d\", try \"%d\" words.\n",blockPwd_length[i]-1,offset);	
+        printf("\" of length \"%d\", try \"%llu\" words.\n",blockPwd_length[i]-1,offset);	
 	
     } else {
-	printf("No found password: try \"%d\" words.\n",offset);
+	printf("No found password: try \"%llu\" words.\n",offset);
 
     }
     free(blockPwd);
     free(blockPwd_init);
     free(blockPwd_length);
+    free(result);
     cuda_Free () ;
 
 }
@@ -184,7 +180,8 @@ void core_dictionary(void) {
 		exit( EXIT_FAILURE );
 	}
 	// Open file of passwords
-	fp_words=file_open(CORE_wordsPath);
+	  fp_words=file_open(CORE_wordsPath);
+	
 	// Read in volume header
 	header_length = file_readHeader(CORE_volumePath,header);
 
@@ -200,12 +197,17 @@ void core_dictionary(void) {
 
         // 2.1 Fill the BlockPwd of passwords and detect the new dimension block.
         // The size of block can change to the number of the read words when the read function go to the end of file.
-        block_size=file_readWordsBlock(fp_words, 1,blockPwd,blockPwd_init,blockPwd_length);
-        if (block_size==0)
+        if (CORE_typeAttack==ATTACK_DICTIONARY)
+            block_size=file_readWordsBlock(fp_words, 1,blockPwd,blockPwd_init,blockPwd_length);
+        if (CORE_typeAttack==ATTACK_CHARSET)
+            block_size=charset_readWordsBlock (1, CORE_charset, CORE_minlength, CORE_maxlength, blockPwd,blockPwd_init,blockPwd_length );
+	else 
+	    printf("Select an invalid operation mode\n");
+//block_size=file_readWordsBlock(fp_words, 1,blockPwd,blockPwd_init,blockPwd_length);
+	if (block_size==0)
             break;
-
+	
         if (CORE_verbose) {
-		printf("%d >> ",iblock);
                 for (j=0;j<blockPwd_length[0];j++)
                     printf("%c",blockPwd[j]);
 		printf(" : ");
@@ -233,19 +235,18 @@ void core_dictionary(void) {
     }
     iblock--;
 
-
     /* 3. Close procedure */
-    file_close(fp_words);
+      file_close(fp_words);
 
     /* 4. Print output message*/
-    uint64_t offset=iblock;
+    uint64_t offset=iblock+1;
     if (status==1) {
         // Retrieve the master key from last block
         int j;
         printf("Found password: \"");
 	for (j=0;j<blockPwd_length[0];j++)
             printf("%c",blockPwd[j]);
-        printf("\" of length \"%d\", try \"%d\" words.\n",blockPwd_length[0],offset);	
+        printf("\" of length \"%d\", try \"%d\" words.\n",blockPwd_length[0]-1,offset);	
     } else {
 	    printf("No found password: try \"%d\" words.\n",offset);
     }
@@ -263,15 +264,23 @@ void core_charset(void) {
     short int status=0;			// value for the found rigth key
     uint64_t i,j,k;			// counters for temporany cycles
     
-    /* 1. Init procedure  */
+    /* 1. Init procedure  */    
+    // Retrieve block size dimension
+   if (CORE_blocksize==0) 
+	CORE_blocksize=1024;//getMultiprocessorCount();
     // Read in volume header
     header_length = file_readHeader(CORE_volumePath,header);
-
+    
     // Allocation and initialization memory of constant structures for cuda procedure
     unsigned char salt[PKCS5_SALT_SIZE];
     memcpy (salt, header + HEADER_SALT_OFFSET, PKCS5_SALT_SIZE);
     cuda_Init (CORE_blocksize, salt,header) ;
-
+    result=malloc(CORE_blocksize*sizeof(short int));
+    if (result==NULL){
+		perror("Memory could not be allocated. ");
+		exit( EXIT_FAILURE );
+	}
+	
     /* 2. Block procedure
      * The algoritm reads and computes NUM_OF_BLOCK passwords each time.
      * Because Cuda Toolkit have problem to reference at pointer of pointer (matrix structure)
@@ -281,80 +290,86 @@ void core_charset(void) {
     unsigned char word[MAXWORDSIZE];
     unsigned short int wordlength;
     uint64_t maxcombination=1;
+    uint8_t iblock;
+    uint64_t bsize;
     CORE_maxlength++;
-
+    
     if (CORE_verbose)
 		printf ( "\nPWDSIZE - COMBINATION/MAXCOMBINATION >> PWD : RESULT\n" );
 	
     for ( wordlength=CORE_minlength; wordlength <  CORE_maxlength && status==0; wordlength++) {
-      maxcombination=1;
+	maxcombination=1;
 	for (i=0;i<wordlength;i++)
 		maxcombination*= strlen(CORE_charset);
 
-	result=malloc(maxcombination*sizeof(short int));
-	if (result==NULL){
-		perror("Memory could not be allocated. ");
-		exit( EXIT_FAILURE );
-	}
-        // 2.2 Calculate the hash header keys decrypt the encrypted header and check the right header key with cuda procedure
-        // PKCS5 is used to derive the primary header key(s) and secondary header key(s) (XTS mode) from the password
-    
-	cuda_Core_charset ( strlen(CORE_charset), CORE_charset, wordlength, result, CORE_keyDerivationFunction) ;
-        for (i=0;i<maxcombination && status!=1 ;i++) {
-		if(result[i]==MATCH)
- 			status=1;
-	} 
-        if (CORE_verbose) {
-		for (j=0;j<maxcombination;j++) {
-			computePwd (j, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
-			word[wordlength]='\0';		
-			/*printf("maxcombination=%d\n",maxcombination);
-			printf("j=%d\n",j);
-			printf("wordlength=%d\n",wordlength);
-			printf("word=%s\n",word);
-			printf("result[%d]=%d\n",j,result[j]);
-			*/
-			printf("%d - %d / %d >> ",wordlength,(int)j,(int)maxcombination);
-			for (k=0;k<wordlength;k++)
-				printf("%c",word[k]);
-			printf(" : ");
-			switch(result[j]){
-			  case MATCH: 
-				printf("MATCH\n");
-				break;
-			  case NOMATCH:
-				printf("NO MATCH\n");
-				break;
-			  default:
-				printf("ERROR\n");
+	for (iblock=0;iblock<maxcombination/CORE_blocksize+1 && status==0;iblock+=1){
+		
+		bsize=CORE_blocksize;  
+		if( iblock==maxcombination/CORE_blocksize )
+		    bsize=maxcombination%CORE_blocksize;
+		    
+		// 2.2 Calculate the hash header keys decrypt the encrypted header and check the right header key with cuda procedure
+		// PKCS5 is used to derive the primary header key(s) and secondary header key(s) (XTS mode) from the password
+		uint64_t offset=(uint64_t)(iblock*CORE_blocksize);
+		printf("iblock:%d / bsize:%d =>> %d / maxcombination: %d\n",iblock,(int)bsize,(int)offset,(int)maxcombination);
+		    
+		cuda_Core_charset ( bsize,offset, strlen(CORE_charset), CORE_charset, wordlength, result, CORE_keyDerivationFunction) ;
+		for (i=0;i<bsize && status!=1 ;i++) {
+			if(result[i]==MATCH)
+				status=1;
+		} 
+		if (CORE_verbose) {
+			for (j=0;j<bsize;j++) {
+				computePwd (iblock*CORE_blocksize+j, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
+				word[wordlength]='\0';		
+				/*printf("maxcombination=%d\n",maxcombination);
+				printf("j=%d\n",j);
+				printf("wordlength=%d\n",wordlength);
+				printf("word=%s\n",word);
+				printf("result[%d]=%d\n",j,result[j]);
+				*/
+				printf("%d - %d / %d >> ",wordlength,(int)(iblock*CORE_blocksize+j),(int)maxcombination);
+				for (k=0;k<wordlength;k++)
+					printf("%c",word[k]);
+				printf(" : ");
+				switch(result[j]){
+				  case MATCH: 
+					printf("MATCH\n");
+					break;
+				  case NOMATCH:
+					printf("NO MATCH\n");
+					break;
+				  default:
+					printf("ERROR\n");
+				}
 			}
 		}
-        }
-        free(result);
+	}
     }
     wordlength--;
+    iblock--;
     i--;
 
     /* 4. Print output message*/
     	int l;
 	uint64_t offset=0;
-	for (k=CORE_minlength;k<=wordlength;k++){
+	for (k=CORE_minlength;k<wordlength;k++){
 		maxcombination=1;
 		for (l=0;l<k;l++)
 			maxcombination*=strlen(CORE_charset);
 		offset+=maxcombination;
 	}
+	offset+=iblock*CORE_blocksize+i+1;
 	if (status==1) {
 		// Retrieve the master key from last block
 		maxcombination=1;
 		for (l=0;l<wordlength;l++)
 			maxcombination*=strlen(CORE_charset);
-		computePwd (i, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
+		computePwd (offset-1, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
 		word[wordlength]='\0';
-		offset+=i;
-		printf("Found password: \"%s\" of length \"%d\", try \"%d\" words.\n",(char*)word,wordlength,offset);
+		printf("Found password: \"%s\" of length \"%d\", try \"%llu\" words.\n",(char*)word,wordlength,offset);
 	} else {
-		printf("No found password: try \"%d\" words.\n",offset);
+		printf("No found password: try \"%llu\" words.\n",offset);
 	}
 
     cuda_Free () ;
@@ -397,14 +412,16 @@ void core_charset(void) {
 	/* 3. Print output message*/
 	uint64_t l,k;
 	uint64_t offset=0;
-	for (k=CORE_minlength;k<=wordlength;k++){
+	for (k=CORE_minlength;k<=wordlength-1;k++){
 		maxcombination=1;
 		for (l=0;l<k;l++)
 			maxcombination*=strlen(CORE_charset);
 		offset+=maxcombination;
 	}
+	  
 	if (status==1) {
 		// Retrieve the master key from last block
+		offset+=ret+1;
 		maxcombination=1;
 		for (l=0;l<wordlength;l++)
 			maxcombination*=strlen(CORE_charset);
@@ -412,6 +429,10 @@ void core_charset(void) {
 		word[wordlength]='\0';
 		printf("Found password: \"%s\" of length \"%d\", try \"%d\" words.\n",(char*)word,wordlength,offset);
 	} else {
+		maxcombination=1;
+		for (l=0;l<wordlength;l++)
+			maxcombination*=strlen(CORE_charset);
+		offset+=maxcombination;
 		printf("No found password: try \"%d\" words.\n",offset);
 	}
 }
