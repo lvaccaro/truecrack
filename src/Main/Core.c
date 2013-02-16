@@ -311,7 +311,7 @@ void core_charset(void) {
 		// 2.2 Calculate the hash header keys decrypt the encrypted header and check the right header key with cuda procedure
 		// PKCS5 is used to derive the primary header key(s) and secondary header key(s) (XTS mode) from the password
 		uint64_t offset=(uint64_t)(iblock*CORE_blocksize);
-		printf("iblock:%d / bsize:%d =>> %d / maxcombination: %d\n",iblock,(int)bsize,(int)offset,(int)maxcombination);
+		//printf("iblock:%d / bsize:%d =>> %d / maxcombination: %d\n",iblock,(int)bsize,(int)offset,(int)maxcombination);
 		    
 		cuda_Core_charset ( bsize,offset, strlen(CORE_charset), CORE_charset, wordlength, result, CORE_keyDerivationFunction) ;
 		for (i=0;i<bsize && status!=1 ;i++) {
