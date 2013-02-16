@@ -309,17 +309,11 @@ void cuda_Core_dictionary ( int bsize, unsigned char *blockPwd, int *blockPwd_in
 
 void cuda_Core_charset ( uint64_t bsize, uint64_t start, unsigned short int charset_length, unsigned char *charset, unsigned short int password_length, short int *result, int keyDerivationFunction) 
 {
-  
-	uint64_t maxcombination=1;
-	for (unsigned short int i=0;i<password_length;i++)
-		maxcombination*=(uint64_t)charset_length;
-	
 	int numBlocks=(int)(bsize/NUMTHREADSXBLOCK)+1;
 	int numThreads=NUMTHREADSXBLOCK;
 	if (bsize<NUMTHREADSXBLOCK)
 		numThreads=(int)bsize;
 	
-			
 	unsigned char *dev_charset = NULL;
 	HANDLE_ERROR(cudaMalloc((void **)&dev_charset, charset_length*sizeof(unsigned char)));
 	HANDLE_ERROR(cudaMemcpy(dev_charset, charset, charset_length*sizeof(unsigned char), cudaMemcpyHostToDevice));
@@ -327,9 +321,8 @@ void cuda_Core_charset ( uint64_t bsize, uint64_t start, unsigned short int char
 	char host_blockPwd[bsize*PASSWORD_MAXSIZE];
 	int host_blockPwd_init[bsize];
 	int host_blockPwd_length[bsize];
-	int offset=start;
 	
-	cuKernel_generate <<<numBlocks,numThreads>>>(dev_blockPwd,dev_blockPwd_init,dev_blockPwd_length,offset,bsize,charset_length,dev_charset,password_length);
+	cuKernel_generate <<<numBlocks,numThreads>>>(dev_blockPwd,dev_blockPwd_init,dev_blockPwd_length,(int)start,bsize,charset_length,dev_charset,password_length);
         if(keyDerivationFunction==RIPEMD160)
 		cuKernel_ripemd160 <<<numBlocks,numThreads>>>(dev_blockPwd, dev_blockPwd_init, dev_blockPwd_length, dev_headerKey, bsize);
         else if(keyDerivationFunction==SHA512)
@@ -344,7 +337,7 @@ void cuda_Core_charset ( uint64_t bsize, uint64_t start, unsigned short int char
 	HANDLE_ERROR( cudaMemcpy(host_blockPwd, dev_blockPwd, bsize*PASSWORD_MAXSIZE*sizeof(unsigned char), cudaMemcpyDeviceToHost));
 	HANDLE_ERROR( cudaMemcpy(host_blockPwd_init, dev_blockPwd_init, bsize*sizeof(int), cudaMemcpyDeviceToHost));
 	HANDLE_ERROR( cudaMemcpy(host_blockPwd_length, dev_blockPwd_length, bsize*sizeof(int), cudaMemcpyDeviceToHost));
-	
+	/*
 	printf("host_blockPwd_init: ");
 	for (int i=0;i<bsize;i++)
 	  printf("%d",host_blockPwd_init[i]);
@@ -355,7 +348,7 @@ void cuda_Core_charset ( uint64_t bsize, uint64_t start, unsigned short int char
 	for (int i=0;i<bsize*PASSWORD_MAXSIZE;i++)
 	  printf("%c",host_blockPwd[i]);
 	printf("\n");
-	
+	*/
 	HANDLE_ERROR( cudaMemcpy(result, dev_result, bsize*sizeof(short int), cudaMemcpyDeviceToHost));
 	HANDLE_ERROR(cudaFree(dev_charset));
 }
