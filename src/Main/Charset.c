@@ -24,10 +24,10 @@
 #include "Charset.h"
 
 /*La funzione numberOfStrings dice di quante parole è composta la permutazione completa di n caratteri in alfabeto per stringhe lunghe da 1 a n caratteri (è di supporto).*/
-unsigned long numberOfStrings(const int alphLength, const int stringLength) {
+unsigned long numberOfStrings(const int alphLength, const int stringMinLength, const int stringMaxLength) {
     unsigned long res = 0;
     int i;
-    for (i=1;i<=stringLength;i++) {
+    for (i=stringMinLength;i<=stringMaxLength;i++) {
         res += pow(alphLength,i);
     }
     return res;
@@ -35,9 +35,9 @@ unsigned long numberOfStrings(const int alphLength, const int stringLength) {
 
 /*La funzione indexedWordFromAlphabet da la i-esima parola dell’elenco delle permutazioni di n caratteri in alfabeto per stringhe da 1 a n caratteri di lunghezza massima.
 */
-char* indexedWordFromAlphabet (unsigned long idx, const char* alphCharset, const int alphLength, const int maxWordLength) {
+char* indexedWordFromAlphabet (unsigned long idx, const char* alphCharset, const int alphLength, const int minWordLength, const int maxWordLength) {
 
-    if (idx >= numberOfStrings(alphLength,maxWordLength)) {
+    if (idx >= numberOfStrings(alphLength,minWordLength,maxWordLength)) {
         return NULL;
     }
 
@@ -47,12 +47,12 @@ char* indexedWordFromAlphabet (unsigned long idx, const char* alphCharset, const
     genWord[0] = alphCharset[idx % alphLength];
     //Ciclo i-esimo
     int i, charIdx;
-    for (i=1;i<(maxWordLength+1);i++) {
-        if (idx<numberOfStrings(alphLength,i)) {
+    for (i=minWordLength;i<(maxWordLength+1);i++) {
+        if (idx<numberOfStrings(alphLength,minWordLength,i)) {
             genWord[i] = '\0';
             break;
         } else {
-            charIdx = (idx-numberOfStrings(alphLength,i)) / (int) pow(alphLength,i);
+            charIdx = (idx-numberOfStrings(alphLength,minWordLength,i)) / (int) pow(alphLength,i);
             genWord[i] = alphCharset[charIdx % alphLength];
         }
     }
@@ -60,25 +60,25 @@ char* indexedWordFromAlphabet (unsigned long idx, const char* alphCharset, const
     return genWord;
 }
 
-int charset_readWordsBlock (int block_size, char *alphabet, int maxlength,char *words, int *words_init, int *words_length) {
+int charset_readWordsBlock (int block_size, char *alphabet, int minlength, int maxlength,char *words, int *words_init, int *words_length) {
 
     char *buffer;
     static int count=0;
     int i;
 
-    if (count >= numberOfStrings(strlen(alphabet),maxlength))
+    if (count >= numberOfStrings(strlen(alphabet),minlength,maxlength))
         return 0;
 
-    for (i=0;i<block_size && count+i<numberOfStrings(strlen(alphabet),maxlength);i++) {
+    for (i=0;i<block_size && count+i<numberOfStrings(strlen(alphabet),minlength,maxlength);i++) {
         //printf("* %s\n",indexedWordFromAlphabet(i+j,"abc",3,3));
-
+	
         if (i==0)
             words_init[0]=0;
         else
             words_init[i]=words_init[i-1]+words_length[i-1];
 
-        buffer=indexedWordFromAlphabet(i+count,alphabet,strlen(alphabet),maxlength);
-	//printf (">>> %d [%d] : %s\n",i,strlen(buffer),buffer);
+        buffer=indexedWordFromAlphabet(i+count,alphabet,strlen(alphabet),minlength,maxlength);
+	//printf (">>> %d [%d] /%d: %s\n",i,strlen(buffer),numberOfStrings(strlen(alphabet),minlength,maxlength),buffer);
         words_length[i]=strlen(buffer);
 
         memcpy(words+words_init[i],buffer,strlen(buffer));

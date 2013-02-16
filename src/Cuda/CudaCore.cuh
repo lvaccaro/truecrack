@@ -39,7 +39,7 @@ void cuda_Free(void);
 void cuda_Core ( int block_currentsize, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result);
 void cuda_Core_dictionary ( int block_currentsize, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result, int keyDerivationFunction);
 
-void cuda_Core_charset ( unsigned short int charset_length, unsigned char *charset, unsigned short int password_length, short int *result, int keyDerivationFunction) ;
+void cuda_Core_charset ( uint64_t bsize, uint64_t isize, unsigned short int charset_length, unsigned char *charset, unsigned short int password_length, short int *result, int keyDerivationFunction) ;
 #if defined(__cplusplus)
 }
 #endif

@@ -51,11 +51,12 @@ truecrack:  $(OBJ_CUDA) $(OBJ_MAIN) $(OBJS_COMMON) $(OBJS_CRYPTO)
 $(OBJ_CUDA): 
 	cat Cuda/CudaCore.cu > Cuda.cu 
 	cat Cuda/CudaPkcs5.cu >> Cuda.cu
+	cat Cuda/CudaAes.cu >> Cuda.cu
+	cat Cuda/CudaXts.cu >> Cuda.cu
 	cat Cuda/cuRmd160.cu >> Cuda.cu
 	cat Cuda/cuSha2.cu >> Cuda.cu
 	cat Cuda/cuWhirlpool.cu >> Cuda.cu
-	cat Cuda/CudaAes.cu >> Cuda.cu
-	cat Cuda/CudaXts.cu >> Cuda.cu
+	
 	$(COMPILER) -c Cuda.cu $(CFLAGS) --opencc-options -OPT:Olimit=0 $< -o $@
 
 $(OBJS_COMMON): %.o: Common/%.c
