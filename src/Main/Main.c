@@ -40,18 +40,21 @@ void print_usage (FILE* stream, int exit_code)
 
     fprintf (stream, "\nUsage:\n"
 		" %s -t <truecrypt_file> -k <ripemd160|sha512|whirlpool> -w <wordlist_file> [-b <parallel_block>]\n"
-		" %s -t <truecrypt_file> -k <ripemd160|sha512|whirlpool> -c <charset> -m <maxlength>\n"
-		, program_name, program_name);
+		" %s -i <truecrypt_header> -k <ripemd160|sha512|whirlpool> -w <wordlist_file> [-b <parallel_block>]\n"
+		" %s -t <truecrypt_file> -k <ripemd160|sha512|whirlpool> -c <charset> [-s <minlength>] -m <maxlength> [-b <parallel_block>]\n"
+		" %s -i <truecrypt_header>  -k <ripemd160|sha512|whirlpool> -c <charset> [-s <minlength>] -m <maxlength> [-b <parallel_block>]\n"
+		, program_name, program_name, program_name, program_name);
     fprintf (stream, "\nOptions:\n"
 		" -h --help            			Display this information.\n"
 		" -t --truecrypt <truecrypt_file>  	Truecrypt volume file.\n"
-    	" -k --key <ripemd160 | sha512 | whirlpool>  	Key derivation function (default ripemd160).\n"
+		" -k --key <ripemd160 | sha512 | whirlpool>  	Key derivation function (default ripemd160).\n"
+		" -b --blocksize <parallel_blocks>   	Number of parallel computations (board dependent).\n"
 		" -w --wordlist <wordlist_file>  	File of words, for Dictionary attack.\n"
-		" -b --blocksize <parallel_blocks>   	Number of parallel computations, for Dictionary attack (board dependent).\n"
 		" -c --charset <alphabet>		Alphabet to generate the passwords for charset attack.\n"
+		" -s --startlength <minlength>		Start length of passwords, for Charset attack (default 1).\n"
 		" -m --maxlength <maxlength>		Maximum length of passwords, for Charset attack.\n"
-		" -s --startlength <minlength>		Start length of passwords, for Charset attack.\n"
 		" -v --verbose         			Show computation messages.\n"
+		" -r --restore <number>			Restero the computation from a defined position.\n"
 		);
     fprintf (stream, "\nSample:\n"
 	" Dictionary mode: %s --truecrypt ./volume --wordlist ./dictionary.txt \n"
@@ -67,7 +70,7 @@ int main (int argc, char* argv[])
 {
     int next_option;
     /* A string listing valid short options letters.*/
-    const char* const short_options = "ht:w:c:m:s:b:k:v";
+    const char* const short_options = "ht:w:c:m:s:b:k:r:v";
     /* An array describing valid long options. */
     const struct option long_options[] = {
         { "help", 0, NULL, 'h' },
@@ -78,6 +81,7 @@ int main (int argc, char* argv[])
         { "startlength",1, NULL, 's' },
         { "blocksize",1,NULL, 'b' },
         { "key",1,NULL, 'k' },
+ 	{ "restore",1,NULL,'r'},
         { "verbose", 0, NULL, 'v' },
         { NULL, 0, NULL, 0 }
         /* Required at end of array.
@@ -101,6 +105,9 @@ int main (int argc, char* argv[])
     int verbose = 0;
     /* Key derivation function. */
     char *keyDerivationFunction=NULL;
+    /* Restore point */
+    long int restore=0;
+    
     /* Remember the name of the program, to incorporate in messages.
     The name is stored in argv[0]. */
     program_name = argv[0];
@@ -145,6 +152,9 @@ int main (int argc, char* argv[])
         case 'b':
             blocksize = atoi(optarg);
             break;
+	case 'r':
+	    restore = atol (optarg);
+	    break;
         case 'k':
             /* -k or --key */
             /* This option takes an argument, the key derivation function.*/
@@ -174,10 +184,12 @@ int main (int argc, char* argv[])
     */
     CORE_verbose=verbose;
     CORE_blocksize=blocksize;
+    CORE_restore=restore;
+
     if (volume_filename!=NULL)
         CORE_volumePath=volume_filename;
     else
-        print_usage (stdout, 0);
+	print_usage (stdout, 0);
 
 
     if (keyDerivationFunction==NULL)

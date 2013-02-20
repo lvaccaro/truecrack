@@ -276,7 +276,7 @@ void cuda_Core_dictionary ( int block_currentsize, unsigned char *blockPwd, int 
 }
 */
 
-void cuda_Core_dictionary ( int bsize, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result, int keyDerivationFunction) {
+float cuda_Core_dictionary ( int bsize, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result, int keyDerivationFunction) {
 	int lengthpwd=0;
 	for (int j=0;j<bsize;j++) {
 		lengthpwd+=blockPwd_length[j];
@@ -293,6 +293,12 @@ void cuda_Core_dictionary ( int bsize, unsigned char *blockPwd, int *blockPwd_in
 	if (bsize<NUMTHREADSXBLOCK)
 		numThread=bsize;
 
+	cudaEvent_t tstart,tstop;
+	float time;
+	cudaEventCreate(&tstart);
+	cudaEventCreate(&tstop);
+	cudaEventRecord(tstart, 0);
+
         if(keyDerivationFunction==RIPEMD160)
 		cuKernel_ripemd160 <<<numBlocks,numThread>>>(dev_blockPwd, dev_blockPwd_init, dev_blockPwd_length, dev_headerKey, bsize);
         else if(keyDerivationFunction==SHA512)
@@ -303,11 +309,16 @@ void cuda_Core_dictionary ( int bsize, unsigned char *blockPwd, int *blockPwd_in
                 ;
 	cuKernel_aes<<<numBlocks,numThread>>>(dev_headerKey, dev_result, bsize);
 
+	cudaEventRecord(tstop, 0);
+	cudaEventSynchronize(tstop);
+	cudaEventElapsedTime(&time, tstart, tstop);
+
 	HANDLE_ERROR(cudaMemcpy(result, dev_result,bsize* sizeof(short int) , cudaMemcpyDeviceToHost));
+	return time;
 }
 
 
-void cuda_Core_charset ( uint64_t bsize, uint64_t start, unsigned short int charset_length, unsigned char *charset, unsigned short int password_length, short int *result, int keyDerivationFunction) 
+float cuda_Core_charset ( uint64_t bsize, uint64_t start, unsigned short int charset_length, unsigned char *charset, unsigned short int password_length, short int *result, int keyDerivationFunction) 
 {
 	int numBlocks=(int)(bsize/NUMTHREADSXBLOCK)+1;
 	int numThreads=NUMTHREADSXBLOCK;
@@ -317,11 +328,17 @@ void cuda_Core_charset ( uint64_t bsize, uint64_t start, unsigned short int char
 	unsigned char *dev_charset = NULL;
 	HANDLE_ERROR(cudaMalloc((void **)&dev_charset, charset_length*sizeof(unsigned char)));
 	HANDLE_ERROR(cudaMemcpy(dev_charset, charset, charset_length*sizeof(unsigned char), cudaMemcpyHostToDevice));
-	
+	/*
 	char host_blockPwd[bsize*PASSWORD_MAXSIZE];
 	int host_blockPwd_init[bsize];
 	int host_blockPwd_length[bsize];
-	
+	*/
+        cudaEvent_t tstart,tstop;
+        float time;
+        cudaEventCreate(&tstart);
+        cudaEventCreate(&tstop);
+        cudaEventRecord(tstart, 0); 	
+
 	cuKernel_generate <<<numBlocks,numThreads>>>(dev_blockPwd,dev_blockPwd_init,dev_blockPwd_length,(int)start,bsize,charset_length,dev_charset,password_length);
         if(keyDerivationFunction==RIPEMD160)
 		cuKernel_ripemd160 <<<numBlocks,numThreads>>>(dev_blockPwd, dev_blockPwd_init, dev_blockPwd_length, dev_headerKey, bsize);
@@ -333,11 +350,13 @@ void cuda_Core_charset ( uint64_t bsize, uint64_t start, unsigned short int char
                 ;
 	cuKernel_aes<<<numBlocks,numThreads>>>(dev_headerKey, dev_result, bsize);
 	
-
+        cudaEventRecord(tstop, 0);
+        cudaEventSynchronize(tstop);
+        cudaEventElapsedTime(&time, tstart, tstop);
+	/*
 	HANDLE_ERROR( cudaMemcpy(host_blockPwd, dev_blockPwd, bsize*PASSWORD_MAXSIZE*sizeof(unsigned char), cudaMemcpyDeviceToHost));
 	HANDLE_ERROR( cudaMemcpy(host_blockPwd_init, dev_blockPwd_init, bsize*sizeof(int), cudaMemcpyDeviceToHost));
 	HANDLE_ERROR( cudaMemcpy(host_blockPwd_length, dev_blockPwd_length, bsize*sizeof(int), cudaMemcpyDeviceToHost));
-	/*
 	printf("host_blockPwd_init: ");
 	for (int i=0;i<bsize;i++)
 	  printf("%d",host_blockPwd_init[i]);
@@ -351,6 +370,7 @@ void cuda_Core_charset ( uint64_t bsize, uint64_t start, unsigned short int char
 	*/
 	HANDLE_ERROR( cudaMemcpy(result, dev_result, bsize*sizeof(short int), cudaMemcpyDeviceToHost));
 	HANDLE_ERROR(cudaFree(dev_charset));
+	return time;
 }
    
 
