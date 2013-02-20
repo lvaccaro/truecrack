@@ -109,8 +109,8 @@ void core_init(void){
 void signalHandler(int signo) {
 	if (signo == SIGINT){
 		printf("\n---BLOCKED---\n");
-		printf("Computed blocks :\t\"%d\"\n",iblock);
-		printf("Size per block :\t\"%d\"\n",block_size);
+		printf("Computed blocks :\t\"%llu\"\n",iblock);
+		printf("Size per block :\t\"%llu\"\n",block_size);
 		printf("Current position:\t\"%d\"\n",i);
 		printf("Total computations:\t\"%llu\"\n",count);
 		core_close();
@@ -253,7 +253,7 @@ void core(void){
 				status=1;
 
 			if (CORE_verbose) {
-				printf("%d\t",count);
+				printf("%llu\t",count);
 				for (j=0;j<blockPwd_length[0];j++)
 					printf("%c",blockPwd[j]);
 				printf("\t");
