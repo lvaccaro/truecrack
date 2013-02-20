@@ -33,6 +33,6 @@ enum{
   NOMATCH,
 };
 
-void cpu_Core_dictionary(int blocksize, unsigned char *encryptedHeader, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result, int keyDerivationFunction) ;
-int cpu_Core_charset(unsigned char *encryptedHeader, unsigned char *CORE_charset, int wordlenght, int verbose, int keyDerivationFunction);
+int cpu_Core_dictionary(int blocksize, unsigned char *encryptedHeader, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result, int keyDerivationFunction) ;
+void cpu_Core_charset(unsigned char *encryptedHeader, unsigned char *CORE_charset, unsigned char *word, int wordlength, int keyDerivationFunction) ;
 #endif

@@ -82,6 +82,19 @@ int file_close (FILE *fp) {
     return 1;
 }
 
+
+unsigned int file_offset (FILE *fp, unsigned int offset) {
+    char buffer[MAXWORDSIZE];
+    int i=0;
+	
+    for (i=0;i<offset;i++) {
+        if (fgets (buffer , MAXWORDSIZE , fp) == NULL)
+            return i;
+	}
+    return i;
+}
+
+
 int file_readWordsBlock (FILE *fp, int block_size, char *words, int *words_init, int *words_length) {
     char buffer[MAXWORDSIZE];
     int i=0;

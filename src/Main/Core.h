@@ -20,7 +20,7 @@
 #define HEADER_CORE
 
 #define SOFTWARE	"TrueCrack"
-#define VERSION		"2.11"
+#define VERSION		"2.15"
 #define WEBSITE		"http://code.google.com/p/truecrack"
 #define AUTHOR		"Luca Vaccaro"
 #define EMAIL		"infotruecrack@gmail.com"
@@ -31,7 +31,7 @@
 
 /* Support bruteforce. */
 enum {
-    ATTACK_DICTIONARY,
+    ATTACK_DICTIONARY=1,
     ATTACK_CHARSET
 };
 
@@ -53,6 +53,8 @@ int CORE_blocksize;
 int CORE_verbose;
 /* Key derivation function. */
 int CORE_keyDerivationFunction;
+/* Restore point */
+long int CORE_restore;
 
 /* Main function */
 void core(void);
