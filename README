@@ -1,44 +1,45 @@
-TRUECRACK v2.5
+TRUECRACK v3.0
 --------------
 website: http://www.truecrack.net , http://code.google.com/p/truecrack
 mail:    infotruecrack@gmail.com
 
 1. WHAT TrueCrack IS?
-TrueCrack is a brute-force password cracker for TrueCrypt (Copyrigth) volume files. It works on Linux and it is optimized with Nvidia Cuda technology.
-It works with cripted volumes with the following algorithms:
-- PBKDF2 (defined in PKCS5 v2.0) based on RIPEMD160 Key derivation function.
-- XTS block cipher mode of operation used for hard disk encryption based on AES. 
-TrueCrack can work in two different modes of use:
-- Dictionary attack: read the passwords from a file of words (one password for line).
-- Charset attack: generate the passwords from a charset of symbols defined by the user (for example: all possible strings of n characters from the charset "abc" ). 
+TrueCrack is a brute-force password cracker for TrueCrypt? (Copyrigth) volume files. It works on Linux and it is optimized for Nvidia Cuda technology.
+It supports:
+- PBKDF2 (defined in PKCS5 v2.0) is based on based on key derivation functions: Ripemd160, Sha512 and Whirlpool.
+- XTS block cipher mode for hard disk encryption based on AES. 
+TrueCrack is able to perform a brute-force attack based on:
+- Dictionary: read the passwords from a file of words.
+- Alphabet: generate all passwords of given length from given alphabet. 
+TrueCrack works on gpu and cpu. In gpu, TrueCrack requires a lots of resources. We suggest to run TrueCrack in a remote session without Xserver and framebuffer. 
 
 2. HOW TO RUN?
-TrueCrack requires a lots of gpu resources. We suggest to disable Xserver, unplug your monitor ( to disable the framebuffer ) and lunch the command in a remote session. 
-Dictionary attack from a wordlist file:
-	./src/truecrack -t <truecrypt_file> -w <wordlist_file> [-b <parallel_blocks>]
-Charset attack from an alphabet with the maximum length:
-	./src/truecrack -t <truecrypt_file> -c <alphabet> -m <maxlength>
+Dictionary attack:
+	truecrack -t <truecrypt_file> -k <ripemd160|sha512|whirlpool>  -w <wordlist_file> [-b <parallel_blocks>]
+Alphabet attack:
+	truecrack -t <truecrypt_file> -k <ripemd160|sha512|whirlpool> -c <charset> [-s <minlength>] -m <maxlength> [-b <parallel_block>]
 
 3. HOW TO USAGE?
--h 	--help 				Display the usage information.
+-h 	--help 				Display this information.
 -t 	--truecrypt <truecrypt_file> 	Truecrypt volume file.
--w 	--wordlist <wordlist_file> 	Wordlist file for dictionary attack.
--b 	--blocksize <parallel_blocks>	Number of concurrent parallel computations for dictionary attack (board dependent).
--c 	--charset <alphabet>		Alphabet to generate the passwords for charset attack.
--m 	--maxlength <maxlength>		Max length of passwords for charset attack.
--v 	--verbose 			Show verbose computation messages.
-Note: the blocksize argument is directly proportional to the number of parallel cuda grid blocks and the number of password computed. A value 10 to blocksize parameter means that there are 10 cuda blocks running in parallel; each block checks and verifies one single password. So 10 blocks mean 10 password computed in parallel. This value is set by default to the number of cores of the current nvidia board (the maximum is 65536 for 1.x and 2.x cuda architectures); if the GPU is disable, blocksize is set to 1024 by default.
+-k 	--key <ripemd160 | sha512 | whirlpool>      Key derivation function (default ripemd160).
+-b 	--blocksize <parallel_blocks>	Number of concurrent parallel computations (board dependent).
+-w 	--wordlist <wordlist_file> 	File of words, for Sictionary attack.
+-c 	--charset <alphabet>		Alphabet generator, for Alphabet attack.
+-m 	--maxlength <maxlength>		Maximum length of passwords, for Alphabet attack.
+-s	--startlength <minlength>       Starting length of passwords, for Alphabet attack (default 1).
+-r	--restore <number>              Restore the computation.
+-v 	--verbose 			Show verbose messages.
 
 4. HOW TO CONFIGURE?
-TrueCrack can work on CPU or GPU modes.
-The configure procedure recognizes the Cuda installation and generates the code for GPU mode. Otherwise it enables the CPU mode.
 ./configure
 	--enable-debug : enable nVidia CUDA debug mode [default=no]
 	--enable-cpu : disable cuda nvidia GPU and use CPU [default=no]
 	--with-cuda=PATH : prefix where cuda is installed [default=auto]
 
 5. HOW TO INSTALL?
-cd ./truecrack
+cd truecrack
+./configure
 make
 sudo make install
 
