@@ -40,9 +40,7 @@ void print_usage (FILE* stream, int exit_code)
 
     fprintf (stream, "\nUsage:\n"
 		" %s -t <truecrypt_file> -k <ripemd160|sha512|whirlpool> -w <wordlist_file> [-b <parallel_block>]\n"
-		" %s -i <truecrypt_header> -k <ripemd160|sha512|whirlpool> -w <wordlist_file> [-b <parallel_block>]\n"
 		" %s -t <truecrypt_file> -k <ripemd160|sha512|whirlpool> -c <charset> [-s <minlength>] -m <maxlength> [-b <parallel_block>]\n"
-		" %s -i <truecrypt_header>  -k <ripemd160|sha512|whirlpool> -c <charset> [-s <minlength>] -m <maxlength> [-b <parallel_block>]\n"
 		, program_name, program_name, program_name, program_name);
     fprintf (stream, "\nOptions:\n"
 		" -h --help            			Display this information.\n"
@@ -50,11 +48,11 @@ void print_usage (FILE* stream, int exit_code)
 		" -k --key <ripemd160 | sha512 | whirlpool>  	Key derivation function (default ripemd160).\n"
 		" -b --blocksize <parallel_blocks>   	Number of parallel computations (board dependent).\n"
 		" -w --wordlist <wordlist_file>  	File of words, for Dictionary attack.\n"
-		" -c --charset <alphabet>		Alphabet to generate the passwords for charset attack.\n"
-		" -s --startlength <minlength>		Start length of passwords, for Charset attack (default 1).\n"
-		" -m --maxlength <maxlength>		Maximum length of passwords, for Charset attack.\n"
+		" -c --charset <alphabet>		Alphabet generator, for Alphabet attack.\n"
+		" -s --startlength <minlength>		Starting length of passwords, for Alphabet attack (default 1).\n"
+		" -m --maxlength <maxlength>		Maximum length of passwords, for Alphabet attack.\n"
+		" -r --restore <number>			Restore the computation.\n"
 		" -v --verbose         			Show computation messages.\n"
-		" -r --restore <number>			Restero the computation from a defined position.\n"
 		);
     fprintf (stream, "\nSample:\n"
 	" Dictionary mode: %s --truecrypt ./volume --wordlist ./dictionary.txt \n"
