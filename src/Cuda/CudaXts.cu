@@ -122,7 +122,9 @@ __device__ void cuda_EncipherBlock(int cipher, void *data, void *ks)
 		// In 32-bit kernel mode, due to KeSaveFloatingPointState() overhead, AES instructions can be used only when processing the whole data unit.
 		aes_encrypt ((const unsigned char*)data, (unsigned char*)data, (const aes_encrypt_ctx *)ks);
 		break;
-
+			
+	//case TWOFISH:		twofish_encrypt (ks, data, data); break;
+	//case SERPENT:		serpent_encrypt (data, data, ks); break;
 	default:			TC_THROW_FATAL_EXCEPTION;	// Unknown/wrong ID
 	}
 }
@@ -138,6 +140,9 @@ __device__ void cuda_DecipherBlock(int cipher, void *data, void *ks)
 #else
 	case AES:		aes_decrypt ((unsigned char*)data, (unsigned char*)data, ((const aes_decrypt_ctx *))ks); break;
 #endif
+			
+	//case SERPENT:	serpent_decrypt (data, data, ks); break;
+	//case TWOFISH:	twofish_decrypt (ks, data, data); break;
 	default:		TC_THROW_FATAL_EXCEPTION;	// Unknown/wrong ID
 	}
 }
@@ -332,13 +337,27 @@ __device__ void cuda_DecryptBuffer (unsigned __int8 *buf, TC_LARGEST_COMPILER_UI
 __device__ int cuda_CipherInit (int cipher, unsigned char *key, unsigned __int8 *ks)
 {
     int retVal = ERR_SUCCESS;
-
+	switch (cipher)
+	{
+		case AES:
     if (aes_encrypt_key256 (key, (aes_encrypt_ctx *) ks) != EXIT_SUCCESS)
         return ERR_CIPHER_INIT_FAILURE;
 
     if (aes_decrypt_key256 (key, (aes_decrypt_ctx *) (ks + sizeof(aes_encrypt_ctx))) != EXIT_SUCCESS)
         return ERR_CIPHER_INIT_FAILURE;
-
+			break;
+			
+		case SERPENT:
+			//serpent_set_key (key, CipherGetKeySize(SERPENT) * 8, ks);
+			break;
+			
+		case TWOFISH:
+			//twofish_set_key ((TwofishInstance *)ks, (const u4byte *)key, CipherGetKeySize(TWOFISH) * 8);
+			break;
+		default:
+			// Unknown/wrong cipher ID
+			return ERR_CIPHER_INIT_FAILURE;
+	}
     return retVal;
 }
 
