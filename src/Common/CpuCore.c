@@ -77,9 +77,9 @@ int cpu_Core_charset(unsigned char *encryptedHeader, unsigned char *CORE_charset
     	if(keyDerivationFunction==RIPEMD160)
     		derive_key_ripemd160 ( word, wordlength+1, salt, PKCS5_SALT_SIZE, 2000, headerKey, cpu_GetMaxPkcs5OutSize ());
     	else if(keyDerivationFunction==SHA512)
-    		derive_key_sha512 (  word, wordlength+1, salt, PKCS5_SALT_SIZE, 2000, headerKey, cpu_GetMaxPkcs5OutSize ());
+    		derive_key_sha512 (  word, wordlength+1, salt, PKCS5_SALT_SIZE, 1000, headerKey, cpu_GetMaxPkcs5OutSize ());
     	else if(keyDerivationFunction==WHIRLPOOL)
-    		derive_key_whirlpool (  word, wordlength+1, salt, PKCS5_SALT_SIZE, 2000, headerKey, cpu_GetMaxPkcs5OutSize ());
+    		derive_key_whirlpool (  word, wordlength+1, salt, PKCS5_SALT_SIZE, 1000, headerKey, cpu_GetMaxPkcs5OutSize ());
     	else{
     		perror("Key derivation function not supported");
     		return;
