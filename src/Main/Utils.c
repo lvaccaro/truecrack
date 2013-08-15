@@ -117,7 +117,7 @@ int file_readWordsBlock (FILE *fp, int block_size, char *words, int *words_init,
 }
 
 
-int file_readHeader(char *volumePath, char *header) {
+int file_readHeader(char *volumePath, char *header, int backup, int hidden) {
     FILE *fp;
     int i=0;
 
@@ -126,6 +126,16 @@ int file_readHeader(char *volumePath, char *header) {
         perror ("Error opening volume file");
         return ;
     }
+
+   if (backup==0 && hidden==0)
+	fseek(fp,0,SEEK_SET);
+   else if (backup==0 && hidden==1)
+	fseek(fp,65536,SEEK_SET);
+   else if (backup==1 && hidden==0)
+	fseek(fp,-65536*2,SEEK_END);
+   else
+	fseek(fp,-65536,SEEK_END);
+
 
     //header offset
     i=0;

@@ -77,7 +77,7 @@ void core_close(void){
 
 void core_init(void){
 	//read the volume	
-	header_length = file_readHeader(CORE_volumePath,header);
+	header_length = file_readHeader(CORE_volumePath,header,CORE_backup,CORE_hidden);
 	memcpy (salt, header + HEADER_SALT_OFFSET, PKCS5_SALT_SIZE);
 
 	if(CORE_verbose)

@@ -29,7 +29,7 @@ FILE *file_open ( char *wordPath);
 int file_close (FILE *fp);
 int file_readWordsBlock (FILE *fp, int block_size, char *words, int *words_init, int *words_length);
 unsigned int file_offset (FILE *fp, unsigned int offset);
-int file_readHeader(char *volumePath, char *header);
+int file_readHeader(char *volumePath, char *header, int backup, int hidden);
 
 //int readWords(char *wordPath, char *words[]);
 

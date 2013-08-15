@@ -39,24 +39,26 @@ void print_usage (FILE* stream, int exit_code)
 	fprintf(stream,"%s\n",MESSAGE);
 
     fprintf (stream, "\nUsage:\n"
-		" %s -t <truecrypt_file> -k <ripemd160|sha512|whirlpool> -w <wordlist_file> [-b <parallel_block>]\n"
-		" %s -t <truecrypt_file> -k <ripemd160|sha512|whirlpool> -c <charset> [-s <minlength>] -m <maxlength> [-b <parallel_block>]\n"
+		" %s -t <truecrypt_file> -k <ripemd160|sha512|whirlpool> -w <wordlist_file> [-a <blocks>] [-b] [-H]\n"
+		" %s -t <truecrypt_file> -k <ripemd160|sha512|whirlpool> -c <charset> [-s <minlength>] -m <maxlength> [-a <blocks>] [-b] [-H]\n"
 		, program_name, program_name, program_name, program_name);
     fprintf (stream, "\nOptions:\n"
 		" -h --help            			Display this information.\n"
 		" -t --truecrypt <truecrypt_file>  	Truecrypt volume file.\n"
-		" -k --key <ripemd160 | sha512 | whirlpool>  	Key derivation function (default ripemd160).\n"
-		" -b --blocksize <parallel_blocks>   	Number of parallel computations (board dependent).\n"
+		" -k --key <ripemd160 | sha512 | whirlpool> Key derivation function (default ripemd160).\n"
+		" -a --aggressive <blocks>	   	Number of parallel computations (board dependent).\n"
 		" -w --wordlist <wordlist_file>  	File of words, for Dictionary attack.\n"
 		" -c --charset <alphabet>		Alphabet generator, for Alphabet attack.\n"
 		" -s --startlength <minlength>		Starting length of passwords, for Alphabet attack (default 1).\n"
 		" -m --maxlength <maxlength>		Maximum length of passwords, for Alphabet attack.\n"
 		" -r --restore <number>			Restore the computation.\n"
+		" -b --backup 				Backup header instead of volume header.\n"
+		" -H --hidden				Hidden Truecrypt volume.\n"
 		" -v --verbose         			Show computation messages.\n"
 		);
     fprintf (stream, "\nSample:\n"
-	" Dictionary mode: %s --truecrypt ./volume --wordlist ./dictionary.txt \n"
-	" Charset mode: %s --truecrypt ./volume --charset ./dictionary.txt --maxlength 10\n"
+	" Dictionary mode: %s --truecrypt ./volume.tc --wordlist ./dictionary.txt \n"
+	" Charset mode: %s --truecrypt ./volume.tc --charset \"1234567890\" --minlength 4 --maxlength 6\n"
 	, program_name, program_name);
     
     exit (exit_code);
@@ -68,7 +70,7 @@ int main (int argc, char* argv[])
 {
     int next_option;
     /* A string listing valid short options letters.*/
-    const char* const short_options = "ht:w:c:m:s:b:k:r:v";
+    const char* const short_options = "ht:w:c:m:s:a:k:r:vbH";
     /* An array describing valid long options. */
     const struct option long_options[] = {
         { "help", 0, NULL, 'h' },
@@ -77,10 +79,12 @@ int main (int argc, char* argv[])
         { "charset",1, NULL, 'c' },
         { "maxlength",1, NULL, 'm' },
         { "startlength",1, NULL, 's' },
-        { "blocksize",1,NULL, 'b' },
+        { "aggressive",1,NULL, 'a' },
         { "key",1,NULL, 'k' },
  	{ "restore",1,NULL,'r'},
         { "verbose", 0, NULL, 'v' },
+        { "backup", 0, NULL, 'b' },
+        { "hidden", 0, NULL, 'H' },
         { NULL, 0, NULL, 0 }
         /* Required at end of array.
         */
@@ -105,6 +109,7 @@ int main (int argc, char* argv[])
     char *keyDerivationFunction=NULL;
     /* Restore point */
     long int restore=0;
+    CORE_backup=0;CORE_hidden=0;
     
     /* Remember the name of the program, to incorporate in messages.
     The name is stored in argv[0]. */
@@ -147,7 +152,7 @@ int main (int argc, char* argv[])
             minlength = atoi(optarg);
             typeAttack=1;
             break;
-        case 'b':
+        case 'a':
             blocksize = atoi(optarg);
             break;
 	case 'r':
@@ -157,6 +162,12 @@ int main (int argc, char* argv[])
             /* -k or --key */
             /* This option takes an argument, the key derivation function.*/
             keyDerivationFunction = optarg;
+            break;
+        case 'b':
+            CORE_backup = 1;
+            break;
+        case 'H':
+            CORE_hidden = 1;
             break;
         case 'v':
             verbose = 1;
