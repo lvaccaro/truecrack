@@ -1,0 +1,12 @@
+EXAMPLES
+
+- PKCS5 hmac ripemd160 & AES-XTS : password "test"
+truecrack -t ripemd160_aes.test.tc -w passwords.txt
+
+- PKCS5 hmac whirlpool & AES-XTS : password "test"
+truecrack -t whirlpool_aes.test.tc -w passwords.txt
+
+- PKCS5 hmac sha512 & AES-XTS : password "test"
+truecrack -t sha512_aes.test.tc -w passwords.txt
+
+
