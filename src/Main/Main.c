@@ -38,27 +38,30 @@ void print_usage (FILE* stream, int exit_code)
 	fprintf(stream,"Contact us: %s\n",EMAIL);
 	fprintf(stream,"%s\n",MESSAGE);
 
-    fprintf (stream, "\nUsage:\n"
-		" %s -t <truecrypt_file> -k <ripemd160|sha512|whirlpool> -w <wordlist_file> [-a <blocks>] [-b] [-H]\n"
-		" %s -t <truecrypt_file> -k <ripemd160|sha512|whirlpool> -c <charset> [-s <minlength>] -m <maxlength> [-a <blocks>] [-b] [-H]\n"
+    fprintf (stream, "\nUsage for Dictionary attack:\n"
+		" %s -t truecrypt_file -w passwords_file [-k ripemd160 | -k sha512 | -k whirlpool] [-e aes | -e serpent | -e twofish] [-a blocks] [-b] [-H] [-r number]\n"
+		"Usage for Alphabet attack:\n"
+		" %s -t truecrypt_file -c alphabet [-s minlength] -m maxlength [-k ripemd160 | -k sha512 | -k whirlpool] [-e aes | -e serpent | -e twofish] [-a blocks] [-b] [-H] [-r number]\n"
 		, program_name, program_name, program_name, program_name);
     fprintf (stream, "\nOptions:\n"
-		" -h --help            			Display this information.\n"
-		" -t --truecrypt <truecrypt_file>  	Truecrypt volume file.\n"
-		" -k --key <ripemd160 | sha512 | whirlpool> Key derivation function (default ripemd160).\n"
-		" -a --aggressive <blocks>	   	Number of parallel computations (board dependent).\n"
-		" -w --wordlist <wordlist_file>  	File of words, for Dictionary attack.\n"
-		" -c --charset <alphabet>		Alphabet generator, for Alphabet attack.\n"
-		" -s --startlength <minlength>		Starting length of passwords, for Alphabet attack (default 1).\n"
-		" -m --maxlength <maxlength>		Maximum length of passwords, for Alphabet attack.\n"
-		" -r --restore <number>			Restore the computation.\n"
-		" -b --backup 				Backup header instead of volume header.\n"
-		" -H --hidden				Hidden Truecrypt volume.\n"
-		" -v --verbose         			Show computation messages.\n"
+		" -h --help						Display this information.\n"
+		" -t --truecrypt <truecrypt_file>		Truecrypt volume file.\n"
+		" -k --key <ripemd160 | sha512 | whirlpool>	Key derivation function (default ripemd160).\n"
+		" -e --encryption <aes | serpent | twofish>	Encryption algorithm (default aes).\n"
+		" -a --aggressive <blocks>			Number of parallel computations (board dependent).\n"
+		" -w --wordlist <wordlist_file>			File of words, for Dictionary attack.\n"
+		" -c --charset <alphabet>			Alphabet generator, for Alphabet attack.\n"
+		" -s --startlength <minlength>			Starting length of passwords, for Alphabet attack (default 1).\n"
+		" -m --maxlength <maxlength>			Maximum length of passwords, for Alphabet attack.\n"
+		" -r --restore <number>				Restore the computation.\n"
+		" -b --backup						Backup header instead of volume header.\n"
+		" -H --hidden						Hidden Truecrypt volume.\n"
+		" -v --verbose						Show computation messages.\n"
 		);
-    fprintf (stream, "\nSample:\n"
-	" Dictionary mode: %s --truecrypt ./volume.tc --wordlist ./dictionary.txt \n"
-	" Charset mode: %s --truecrypt ./volume.tc --charset \"1234567890\" --minlength 4 --maxlength 6\n"
+    fprintf (stream, "\nSample for Dictionary attack:\n"
+	" %s -t volume.tc -w dictionary.txt \n"
+	"Sample for Alphabet attack:\n"
+	" %s -t volume.tc -c \"1234567890\" -s 4 -m 6\n"
 	, program_name, program_name);
     
     exit (exit_code);
@@ -70,7 +73,7 @@ int main (int argc, char* argv[])
 {
     int next_option;
     /* A string listing valid short options letters.*/
-    const char* const short_options = "ht:w:c:m:s:a:k:r:vbH";
+    const char* const short_options = "ht:w:c:m:s:a:k:r:e:vbH";
     /* An array describing valid long options. */
     const struct option long_options[] = {
         { "help", 0, NULL, 'h' },
@@ -81,7 +84,8 @@ int main (int argc, char* argv[])
         { "startlength",1, NULL, 's' },
         { "aggressive",1,NULL, 'a' },
         { "key",1,NULL, 'k' },
- 	{ "restore",1,NULL,'r'},
+		{ "encryption",1,NULL, 'e' },
+		{ "restore",1,NULL,'r'},
         { "verbose", 0, NULL, 'v' },
         { "backup", 0, NULL, 'b' },
         { "hidden", 0, NULL, 'H' },
@@ -107,10 +111,15 @@ int main (int argc, char* argv[])
     int verbose = 0;
     /* Key derivation function. */
     char *keyDerivationFunction=NULL;
-    /* Restore point */
+	/* Encryption algorithm. */
+    char *encryptionAlgorithm=NULL;
+    /* Restore point. */
     long int restore=0;
-    CORE_backup=0;CORE_hidden=0;
-    
+	/* Backup header. */
+    CORE_backup=0;
+	/* Hidden volume. */
+	CORE_hidden=0;
+	
     /* Remember the name of the program, to incorporate in messages.
     The name is stored in argv[0]. */
     program_name = argv[0];
@@ -155,14 +164,19 @@ int main (int argc, char* argv[])
         case 'a':
             blocksize = atoi(optarg);
             break;
-	case 'r':
-	    restore = atol (optarg);
-	    break;
+		case 'r':
+			restore = atol (optarg);
+			break;
         case 'k':
             /* -k or --key */
             /* This option takes an argument, the key derivation function.*/
             keyDerivationFunction = optarg;
             break;
+		case 'e':
+			/* -e or --encryption */
+			/* This option takes an argument, the encryption algorithm.*/
+			encryptionAlgorithm = optarg;
+			break;
         case 'b':
             CORE_backup = 1;
             break;
@@ -200,7 +214,17 @@ int main (int argc, char* argv[])
     else
 	print_usage (stdout, 0);
 
-
+    if (encryptionAlgorithm==NULL)
+    	CORE_encryptionAlgorithm=AES;
+    else if (strcasecmp(encryptionAlgorithm,"aes")==0)
+    	CORE_encryptionAlgorithm=AES;
+    else if (strcasecmp(encryptionAlgorithm,"serpent")==0)
+        CORE_encryptionAlgorithm=SERPENT;
+    else if (strcasecmp(encryptionAlgorithm,"twofish")==0)
+        CORE_encryptionAlgorithm=TWOFISH;
+    else
+        print_usage (stdout, 0);
+	
     if (keyDerivationFunction==NULL)
     	CORE_keyDerivationFunction=RIPEMD160;
     else if (strcasecmp(keyDerivationFunction,"ripemd160")==0)

@@ -201,12 +201,12 @@ typedef struct
 #endif
 
 #if !defined (TC_WINDOWS_BOOT) || defined (TC_WINDOWS_BOOT_AES)
-#	include "Aes.h"
+#	include "Aes.cuh"
 #else
-#	include "AesSmall.h"
+#	include "AesSmall.cuh"
 #endif
-#include "Serpent.h"
-#include "Twofish.h"
+#include "Serpent.cuh"
+#include "Twofish.cuh"
 
 //#include "GfMul.h"
 #include "Password.h"
@@ -274,69 +274,37 @@ typedef struct CRYPTO_INFO_t
 
 } CRYPTO_INFO, *PCRYPTO_INFO;
 
-PCRYPTO_INFO crypto_open (void);
-void crypto_loadkey (PKEY_INFO keyInfo, char *lpszUserKey, int nUserKeyLen);
-void crypto_close (PCRYPTO_INFO cryptoInfo);
+__device__ PCRYPTO_INFO cuCrypto_open (void);
+__device__ void cuCrypto_loadkey (PKEY_INFO keyInfo, char *lpszUserKey, int nUserKeyLen);
+__device__ void cuCrypto_close (PCRYPTO_INFO cryptoInfo);
 
-int CipherGetBlockSize (int cipher);
-int CipherGetKeySize (int cipher);
-int CipherGetKeyScheduleSize (int cipher);
-BOOL CipherSupportsIntraDataUnitParallelization (int cipher);
-char * CipherGetName (int cipher);
 
-int CipherInit (int cipher, unsigned char *key, unsigned char *ks);
-int EAInit (int ea, unsigned char *key, unsigned char *ks);
-BOOL EAInitMode (PCRYPTO_INFO ci);
-void EncipherBlock(int cipher, void *data, void *ks);
-void DecipherBlock(int cipher, void *data, void *ks);
+__device__ int cuCipherInit (int cipher, unsigned char *key, unsigned char *ks);
+__device__ int cuEAInit (int ea, unsigned char *key, unsigned char *ks);
+__device__ BOOL cuEAInitMode (PCRYPTO_INFO ci);
+__device__ void cuEncipherBlock(int cipher, void *data, void *ks);
+__device__ void cuDecipherBlock(int cipher, void *data, void *ks);
 #ifndef TC_WINDOWS_BOOT
-void EncipherBlocks (int cipher, void *dataPtr, void *ks, size_t blockCount);
-void DecipherBlocks (int cipher, void *dataPtr, void *ks, size_t blockCount);
+__device__ void cuEncipherBlocks (int cipher, void *dataPtr, void *ks, size_t blockCount);
+__device__ void cuDecipherBlocks (int cipher, void *dataPtr, void *ks, size_t blockCount);
 #endif
-
-int EAGetFirst ();
-int EAGetCount (void);
-int EAGetNext (int previousEA);
-char * EAGetName (char *buf, int ea);
-int EAGetByName (char *name);
-int EAGetKeySize (int ea);
-int EAGetFirstMode (int ea);
-int EAGetNextMode (int ea, int previousModeId);
-char * EAGetModeName (int ea, int mode, BOOL capitalLetters);
-int EAGetKeyScheduleSize (int ea);
-int EAGetLargestKey ();
-int EAGetLargestKeyForMode (int mode);
-
-int EAGetCipherCount (int ea);
-int EAGetFirstCipher (int ea);
-int EAGetLastCipher (int ea);
-int EAGetNextCipher (int ea, int previousCipherId);
-int EAGetPreviousCipher (int ea, int previousCipherId);
-int EAIsFormatEnabled (int ea);
-BOOL EAIsModeSupported (int ea, int testedMode);
-
-char *HashGetName (int hash_algo_id);
-BOOL HashIsDeprecated (int hashId);
 
 int GetMaxPkcs5OutSize (void);
 
-void EncryptDataUnits (unsigned __int8 *buf, const UINT64_STRUCT *structUnitNo, uint32 nbrUnits, PCRYPTO_INFO ci);
-void EncryptDataUnitsCurrentThread (unsigned __int8 *buf, const UINT64_STRUCT *structUnitNo, TC_LARGEST_COMPILER_UINT nbrUnits, PCRYPTO_INFO ci);
-void DecryptDataUnits (unsigned __int8 *buf, const UINT64_STRUCT *structUnitNo, uint32 nbrUnits, PCRYPTO_INFO ci);
-void DecryptDataUnitsCurrentThread (unsigned __int8 *buf, const UINT64_STRUCT *structUnitNo, TC_LARGEST_COMPILER_UINT nbrUnits, PCRYPTO_INFO ci);
-void EncryptBuffer (unsigned __int8 *buf, TC_LARGEST_COMPILER_UINT len, PCRYPTO_INFO cryptoInfo);
-void DecryptBuffer (unsigned __int8 *buf, TC_LARGEST_COMPILER_UINT len, PCRYPTO_INFO cryptoInfo);
+__device__ void EncryptDataUnits (unsigned __int8 *buf, const UINT64_STRUCT *structUnitNo, uint32 nbrUnits, PCRYPTO_INFO ci);
+__device__ void EncryptDataUnitsCurrentThread (unsigned __int8 *buf, const UINT64_STRUCT *structUnitNo, TC_LARGEST_COMPILER_UINT nbrUnits, PCRYPTO_INFO ci);
+__device__ void DecryptDataUnits (unsigned __int8 *buf, const UINT64_STRUCT *structUnitNo, uint32 nbrUnits, PCRYPTO_INFO ci);
+__device__ void DecryptDataUnitsCurrentThread (unsigned __int8 *buf, const UINT64_STRUCT *structUnitNo, TC_LARGEST_COMPILER_UINT nbrUnits, PCRYPTO_INFO ci);
+__device__ void cuEncryptBuffer (unsigned __int8 *buf, TC_LARGEST_COMPILER_UINT len, PCRYPTO_INFO cryptoInfo);
+__device__ void cuDecryptBuffer (unsigned __int8 *buf, TC_LARGEST_COMPILER_UINT len, PCRYPTO_INFO cryptoInfo);
 #ifndef TC_NO_COMPILER_INT64
-void EncryptBufferLRW128 (byte *buffer, uint64 length, uint64 blockIndex, PCRYPTO_INFO cryptoInfo);
-void DecryptBufferLRW128 (byte *buffer, uint64 length, uint64 blockIndex, PCRYPTO_INFO cryptoInfo);
-void EncryptBufferLRW64 (byte *buffer, uint64 length, uint64 blockIndex, PCRYPTO_INFO cryptoInfo);
-void DecryptBufferLRW64 (byte *buffer, uint64 length, uint64 blockIndex, PCRYPTO_INFO cryptoInfo);
-uint64 DataUnit2LRWIndex (uint64 dataUnit, int blockSize, PCRYPTO_INFO ci);
+__device__ void cuEncryptBufferLRW128 (byte *buffer, uint64 length, uint64 blockIndex, PCRYPTO_INFO cryptoInfo);
+__device__ void cuDecryptBufferLRW128 (byte *buffer, uint64 length, uint64 blockIndex, PCRYPTO_INFO cryptoInfo);
+__device__ void cuEncryptBufferLRW64 (byte *buffer, uint64 length, uint64 blockIndex, PCRYPTO_INFO cryptoInfo);
+__device__ void cuDecryptBufferLRW64 (byte *buffer, uint64 length, uint64 blockIndex, PCRYPTO_INFO cryptoInfo);
+__device__ uint64 DataUnit2LRWIndex (uint64 dataUnit, int blockSize, PCRYPTO_INFO ci);
 #endif	// #ifndef TC_NO_COMPILER_INT64
 
-BOOL IsAesHwCpuSupported ();
-void EnableHwEncryption (BOOL enable);
-BOOL IsHwEncryptionEnabled ();
 
 #ifdef __cplusplus
 }

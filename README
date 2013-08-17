@@ -1,4 +1,4 @@
-TRUECRACK v3.0
+TRUECRACK v3.2
 --------------
 website: http://www.truecrack.net , http://code.google.com/p/truecrack
 mail:    infotruecrack@gmail.com
@@ -6,8 +6,9 @@ mail:    infotruecrack@gmail.com
 1. WHAT TrueCrack IS?
 TrueCrack is a brute-force password cracker for TrueCrypt? (Copyrigth) volume files. It works on Linux and it is optimized for Nvidia Cuda technology.
 It supports:
-- PBKDF2 (defined in PKCS5 v2.0) is based on based on key derivation functions: Ripemd160, Sha512 and Whirlpool.
-- XTS block cipher mode for hard disk encryption based on AES. 
+- PBKDF2 (defined in PKCS5 v2.0) based on key derivation functions: Ripemd160, Sha512 and Whirlpool.
+- XTS block cipher mode for hard disk encryption based on encryption algorithms: AES, SERPENT, TWOFISH.
+- Hidden Truecrypt volumes and backup headers. 
 TrueCrack is able to perform a brute-force attack based on:
 - Dictionary: read the passwords from a file of words.
 - Alphabet: generate all passwords of given length from given alphabet. 
@@ -15,21 +16,24 @@ TrueCrack works on gpu and cpu. In gpu, TrueCrack requires a lots of resources. 
 
 2. HOW TO RUN?
 Dictionary attack:
-	truecrack -t <truecrypt_file> -k <ripemd160|sha512|whirlpool>  -w <wordlist_file> [-b <parallel_blocks>]
+	truecrack -t truecrypt_file -w passwords_file [-k ripemd160 | -k sha512 | -k whirlpool] [-e aes | -e serpent | -e twofish] [-a blocks] [-b] [-H] [-r number]
 Alphabet attack:
-	truecrack -t <truecrypt_file> -k <ripemd160|sha512|whirlpool> -c <charset> [-s <minlength>] -m <maxlength> [-b <parallel_block>]
+	truecrack -t truecrypt_file -c alphabet [-s minlength] -m maxlength [-k ripemd160 | -k sha512 | -k whirlpool] [-e aes | -e serpent | -e twofish] [-a blocks] [-b] [-H] [-r number]
 
 3. HOW TO USAGE?
--h 	--help 				Display this information.
--t 	--truecrypt <truecrypt_file> 	Truecrypt volume file.
--k 	--key <ripemd160 | sha512 | whirlpool>      Key derivation function (default ripemd160).
--b 	--blocksize <parallel_blocks>	Number of concurrent parallel computations (board dependent).
--w 	--wordlist <wordlist_file> 	File of words, for Sictionary attack.
--c 	--charset <alphabet>		Alphabet generator, for Alphabet attack.
--m 	--maxlength <maxlength>		Maximum length of passwords, for Alphabet attack.
--s	--startlength <minlength>       Starting length of passwords, for Alphabet attack (default 1).
--r	--restore <number>              Restore the computation.
--v 	--verbose 			Show verbose messages.
+-h 	--help 					Display this information.
+-t 	--truecrypt <truecrypt_file> 		Truecrypt volume file.
+-k 	--key <ripemd160 | sha512 | whirlpool>	Key derivation function (default ripemd160).
+-e 	--encryption <aes | serpent | twofish>	Encryption algorithm (default aes).
+-a 	--aggressive <blocks>			Number of parallel computations (board dependent).
+-w 	--wordlist <wordlist_file> 		File of words, for Sictionary attack.
+-c 	--charset <alphabet>			Alphabet generator, for Alphabet attack.
+-m 	--maxlength <maxlength>			Maximum length of passwords, for Alphabet attack.
+-s	--startlength <minlength>       	Starting length of passwords, for Alphabet attack (default 1).
+-r	--restore <number>              	Restore the computation.
+-b	--backup 				Backup header instead of volume header.
+-H	--hidden				Hidden Truecrypt volume.
+-v 	--verbose 				Show verbose messages.
 
 4. HOW TO CONFIGURE?
 ./configure
@@ -42,11 +46,8 @@ cd truecrack
 ./configure
 make
 sudo make install
-
  
 6. LICENSE
 TrueCrack is an Open Source Software under GNU Public License version 3.
 This software is Based on TrueCrypt, freely available at http://www.truecrypt.org/
 Contact the author:  Luca Vaccaro <luck87@gmail.com>
-
-

@@ -1,22 +1,21 @@
 EXAMPLES
 
-- standard volume: PKCS5 hmac-ripemd160 & AES-XTS : password "test"
-truecrack -t ripemd160_aes.test.tc -w passwords.txt
+1. Standard volume with different key derivation functions: password "test"
+- PKCS5 hmac-ripemd160 & AES-XTS : truecrack -t ripemd160_aes.test.tc -w passwords.txt
+- PKCS5 hmac-whirlpool & AES-XTS : truecrack -t whirlpool_aes.test.tc -w passwords.txt -k whirlpool
+- PKCS5 hmac-sha512    & AES-XTS : truecrack -t sha512_aes.test.tc -w passwords.txt -k sha512
 
-- standard volume from backup header: PKCS5 hmac-ripemd160 & AES-XTS : password "test"
-truecrack -t ripemd160_aes.test.tc -w passwords.txt -b
+2. Standard volume with different encryption algorithms: password "test"
+- PKCS5 hmac-ripemd160 & AES-XTS     : truecrack -t ripemd160_aes.test.tc -w passwords.txt
+- PKCS5 hmac-ripemd160 & SERPENT-XTS : truecrack -t ripemd160_serpent.test.tc -w passwords.txt -e serpent
+- PKCS5 hmac-ripemd160 & TWOFISH-XTS : truecrack -t ripemd160_twofish.test.tc -w passwords.txt -e twofish
 
-- standard volume: PKCS5 hmac-whirlpool & AES-XTS : password "test"
-truecrack -t whirlpool_aes.test.tc -w passwords.txt -k whirlpool
+3. Standard volume from backup header: password "test"
+- PKCS5 hmac-ripemd160 & AES-XTS : truecrack -t ripemd160_aes.test.tc -w passwords.txt -b
 
-- standard volume: PKCS5 hmac-sha512 & AES-XTS : password "test"
-truecrack -t sha512_aes.test.tc -w passwords.txt -k sha512
+4. Hidden volume: password "test", password hidden area "hidden"
+- PKCS5 hmac-ripemd160 & AES-XTS : truecrack -t ripemd160_aes.test.tc -w passwords.txt -H
 
-- hidden volume: PKCS5 hmac-ripemd160 & AES-XTS : password "test" - password hidden area "hidden"
-truecrack -t ripemd160_aes.test.tc -w passwords.txt
-truecrack -t ripemd160_aes.test.tc -w passwords.txt -H
-
-- hidden volume from backup header: PKCS5 hmac-ripemd160 & AES-XTS : password "test" - password hidden area "hidden"
-truecrack -t ripemd160_aes.test.tc -w passwords.txt -b
-truecrack -t ripemd160_aes.test.tc -w passwords.txt -H -b
+5. Hidden volume from backup header: password "test", password hidden area "hidden"
+- PKCS5 hmac-ripemd160 & AES-XTS : truecrack -t ripemd160_aes.test.tc -w passwords.txt -H -b
 

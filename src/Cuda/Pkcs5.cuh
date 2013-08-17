@@ -38,9 +38,9 @@ extern "C"
 {
 #endif
 
-#include "cuRmd160.cuh"
-#include "cuSha2.cuh"
-#include "cuWhirlpool.cuh"
+#include "Rmd160.alternative.cuh"
+#include "Sha2.cuh"
+#include "Whirlpool.cuh"
 
 #define MAX_BLOCKS		12
 
@@ -66,14 +66,18 @@ __device__ void cuda_hmac_whirlpool(  unsigned char *k, int lk, unsigned char *d
 __device__ void cuda_derive_u_whirlpool (unsigned char *pwd, int pwd_len, unsigned char *salt, int salt_len, int iterations, unsigned char *u, int b);
 __device__ void cuda_derive_key_whirlpool (unsigned char *pwd, int pwd_len, unsigned char *salt, int salt_len, int iterations, unsigned char *dk, int dklen);
 
+__device__ void cuda_hmac_ripemd160 (unsigned char *key, int keylen, unsigned char *input, int len, unsigned char *digest);
+__device__ void cuda_derive_u_ripemd160 (unsigned char *pwd, int pwd_len, unsigned char *salt, int salt_len, int iterations, unsigned char *u, int b);
+__device__ void cuda_derive_key_ripemd160 (unsigned char *pwd, int pwd_len, unsigned char *salt, int salt_len, int iterations, unsigned char *dk, int dklen);
+
 /*
 __device__ void hmac_ripemd160 (char *key, int keylen, char *input, int len, char *digest);
 __device__ void derive_u_ripemd160 (char *pwd, int pwd_len, char *salt, int salt_len, int iterations, char *u, int b);
 __device__ void derive_key_ripemd160 (char *pwd, int pwd_len, char *salt, int salt_len, int iterations, char *dk, int dklen);
-*/
 
 __device__ void cuda_Pbkdf2 ( unsigned char *salt, unsigned char *pwd, int pwd_len, unsigned char *headerkey) ;
 __device__ void cuda_hmac_ripemd160 (unsigned char *key, int keylen, unsigned char *input, int len, unsigned char *digest, SupportPkcs5 *sup);
+*/
 
 
 #if defined(__cplusplus)

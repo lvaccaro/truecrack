@@ -17,28 +17,30 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
+ #include "Xts.cuh"
 #if BYTE_ORDER == BIG_ENDIAN
 #error The TC_NO_COMPILER_INT64 version of the XTS code is not compatible with big-endian platforms
 #endif
 #include "Endian.h"
+#include "Volumes.cuh"
 
 #if BYTE_ORDER == LITTLE_ENDIAN
-#	define CUDA_BE16(x) cuda_MirrorBytes16(x)
-#	define CUDA_BE32(x) cuda_MirrorBytes32(x)
-#	define CUDA_BE64(x) cuda_MirrorBytes64(x)
+#	define CUDA_BE16(x) cuMirrorBytes16(x)
+#	define CUDA_BE32(x) cuMirrorBytes32(x)
+#	define CUDA_BE64(x) cuMirrorBytes64(x)
 #else
 #	define CUDA_BE16(x) (x)
 #	define CUDA_BE32(x) (x)
 #	define CUDA_BE64(x) (x)
 #endif
 
-__device__ unsigned __int16 cuda_MirrorBytes16 (unsigned __int16 x)
+__device__ unsigned __int16 cuMirrorBytes16 (unsigned __int16 x)
 {
 	return (x << 8) | (x >> 8);
 }
 
 
-__device__ unsigned __int32 cuda_MirrorBytes32 (unsigned __int32 x)
+__device__ unsigned __int32 cuMirrorBytes32 (unsigned __int32 x)
 {
 	unsigned __int32 n = (unsigned __int8) x;
 	n <<= 8; n |= (unsigned __int8) (x >> 8);
@@ -46,13 +48,13 @@ __device__ unsigned __int32 cuda_MirrorBytes32 (unsigned __int32 x)
 	return (n << 8) | (unsigned __int8) (x >> 24);
 }
 
-__device__ uint16 cuda_GetHeaderField16 (byte *header, int offset)
+__device__ uint16 cuGetHeaderField16 (byte *header, int offset)
 {
 	return CUDA_BE16 (*(uint16 *) (header + offset));
 }
 
 
-__device__ uint32 cuda_GetHeaderField32 (byte *header, int offset)
+__device__ uint32 cuGetHeaderField32 (byte *header, int offset)
 {
 	return CUDA_BE32 (*(uint32 *) (header + offset));
 }
@@ -95,7 +97,7 @@ __constant__ unsigned __int32 cuda_crc_32_tab[]=
 	0xb3667a2e, 0xc4614ab8, 0x5d681b02, 0x2a6f2b94, 0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d
 };
 
-__device__ unsigned __int32 cuda_GetCrc32 (unsigned char *data, int length)
+__device__ unsigned __int32 cuGetCrc32 (unsigned char *data, int length)
 {
 	unsigned __int32 CRC = 0xffffffff;
 
@@ -107,66 +109,12 @@ __device__ unsigned __int32 cuda_GetCrc32 (unsigned char *data, int length)
 	return CRC ^ 0xffffffff;
 }
 
-__device__ void cuda_memcpy (unsigned char* to , unsigned char* from, int length){
-  int i;
-  for (i=0;i<length;i++)
-    to[i]=from[i];
-}
 
-
-__device__ void cuda_EncipherBlock(int cipher, void *data, void *ks)
-{
-	switch (cipher)
-	{
-	case AES:	
-		// In 32-bit kernel mode, due to KeSaveFloatingPointState() overhead, AES instructions can be used only when processing the whole data unit.
-		aes_encrypt ((const unsigned char*)data, (unsigned char*)data, (const aes_encrypt_ctx *)ks);
-		break;
-			
-	//case TWOFISH:		twofish_encrypt (ks, data, data); break;
-	//case SERPENT:		serpent_encrypt (data, data, ks); break;
-	default:			TC_THROW_FATAL_EXCEPTION;	// Unknown/wrong ID
-	}
-}
-__device__ void cuda_DecipherBlock(int cipher, void *data, void *ks)
-{
-	switch (cipher)
-	{
-#ifndef TC_WINDOWS_BOOT
-
-	case AES:
-		aes_decrypt ((const unsigned char*)data, (unsigned char*)data, (const aes_decrypt_ctx *) ((char *) ks + sizeof(aes_decrypt_ctx)));
-		break;
-#else
-	case AES:		aes_decrypt ((unsigned char*)data, (unsigned char*)data, ((const aes_decrypt_ctx *))ks); break;
-#endif
-			
-	//case SERPENT:	serpent_decrypt (data, data, ks); break;
-	//case TWOFISH:	twofish_decrypt (ks, data, data); break;
-	default:		TC_THROW_FATAL_EXCEPTION;	// Unknown/wrong ID
-	}
-}
-
-
-// Converts a 64-bit unsigned integer (passed as two 32-bit integers for compatibility with non-64-bit
-// environments/platforms) into a little-endian 16-byte array.
-__device__ static void cuda_Uint64ToLE16ByteArray (unsigned __int8 *byteBuf, unsigned __int32 highInt32, unsigned __int32 lowInt32)
-{
-	unsigned __int32 *bufPtr32 = (unsigned __int32 *) byteBuf;
-
-	*bufPtr32++ = lowInt32;
-	*bufPtr32++ = highInt32;
-
-	// We're converting a 64-bit number into a little-endian 16-byte array so we can zero the last 8 bytes
-	*bufPtr32++ = 0;
-	*bufPtr32 = 0;
-}
-    
 
 
 // Encrypts or decrypts all blocks in the buffer in XTS mode. For descriptions of the input parameters,
 // see the 64-bit version of EncryptBufferXTS().
-__device__ static void cuda_EncryptDecryptBufferXTS32 (const unsigned __int8 *buffer,
+__device__ static void cuEncryptDecryptBufferXTS32 (const unsigned __int8 *buffer,
         TC_LARGEST_COMPILER_UINT length,
         const UINT64_STRUCT *startDataUnitNo,
         unsigned int startBlock,
@@ -202,7 +150,7 @@ __device__ static void cuda_EncryptDecryptBufferXTS32 (const unsigned __int8 *bu
 
 	// Convert the 64-bit data unit number into a little-endian 16-byte array. 
 	// (Passed as two 32-bit integers for compatibility with non-64-bit environments/platforms.)
-	cuda_Uint64ToLE16ByteArray (byteBufUnitNo, dataUnitNo.HighPart, dataUnitNo.LowPart);
+	cuUint64ToLE16ByteArray (byteBufUnitNo, dataUnitNo.HighPart, dataUnitNo.LowPart);
 
 	// Generate whitening values for all blocks in the buffer
 	while (blockCount > 0)
@@ -217,9 +165,9 @@ __device__ static void cuda_EncryptDecryptBufferXTS32 (const unsigned __int8 *bu
 
 		// Encrypt the data unit number using the secondary key (in order to generate the first 
 		// whitening value for this data unit)
-		cuda_Uint64ToLE16ByteArray (byteBufUnitNo, dataUnitNo.HighPart, dataUnitNo.LowPart);
+		cuUint64ToLE16ByteArray (byteBufUnitNo, dataUnitNo.HighPart, dataUnitNo.LowPart);
 		memcpy (whiteningValue, byteBufUnitNo, BYTES_PER_XTS_BLOCK);
-		cuda_EncipherBlock (cipher, whiteningValue, ks2);
+		cuEncipherBlock (cipher, whiteningValue, ks2);
 
 		// Generate (and apply) subsequent whitening values for blocks in this data unit and
 		// encrypt/decrypt all relevant blocks in this data unit
@@ -239,9 +187,9 @@ __device__ static void cuda_EncryptDecryptBufferXTS32 (const unsigned __int8 *bu
 
 				// Actual encryption/decryption
 				if (decryption)
-					cuda_DecipherBlock (cipher, bufPtr32, ks);
+					cuDecipherBlock (cipher, bufPtr32, ks);
 				else
-					cuda_EncipherBlock (cipher, bufPtr32, ks);
+					cuEncipherBlock (cipher, bufPtr32, ks);
 
 				whiteningValuePtr32 = (unsigned __int32 *) whiteningValue;
 
@@ -290,7 +238,7 @@ __device__ static void cuda_EncryptDecryptBufferXTS32 (const unsigned __int8 *bu
 		}
 
 		// Convert the 64-bit data unit number into a little-endian 16-byte array. 
-		cuda_Uint64ToLE16ByteArray (byteBufUnitNo, dataUnitNo.HighPart, dataUnitNo.LowPart);
+		cuUint64ToLE16ByteArray (byteBufUnitNo, dataUnitNo.HighPart, dataUnitNo.LowPart);
 	}
 
 	FAST_ERASE64 (whiteningValue, sizeof (whiteningValue));
@@ -298,7 +246,7 @@ __device__ static void cuda_EncryptDecryptBufferXTS32 (const unsigned __int8 *bu
 
 
 // For descriptions of the input parameters, see the 64-bit version of EncryptBufferXTS().
-__device__ void cuda_DecryptBufferXTS (unsigned __int8 *buffer,
+__device__ void cuDecryptBufferXTS (unsigned __int8 *buffer,
 					   TC_LARGEST_COMPILER_UINT length,
 					   const UINT64_STRUCT *startDataUnitNo,
 					   unsigned int startCipherBlockNo,
@@ -307,10 +255,10 @@ __device__ void cuda_DecryptBufferXTS (unsigned __int8 *buffer,
 					   int cipher)
 {
 	// Decrypt all ciphertext blocks in the buffer
-	cuda_EncryptDecryptBufferXTS32 (buffer, length, startDataUnitNo, startCipherBlockNo, ks, ks2, cipher, TRUE);
+	cuEncryptDecryptBufferXTS32 (buffer, length, startDataUnitNo, startCipherBlockNo, ks, ks2, cipher, TRUE);
 }
 
-__device__ void cuda_DecryptBuffer (unsigned __int8 *buf, TC_LARGEST_COMPILER_UINT len, PCRYPTO_INFO cryptoInfo)
+__device__ void cuDecryptBuffer (unsigned __int8 *buf, TC_LARGEST_COMPILER_UINT len, PCRYPTO_INFO cryptoInfo)
 {
 	//unsigned __int8 *ks = cryptoInfo->ks;  //+ EAGetKeyScheduleSize (cryptoInfo->ea);
 	//unsigned __int8 *ks2 = cryptoInfo->ks2;// + EAGetKeyScheduleSize (cryptoInfo->ea);
@@ -329,91 +277,12 @@ __device__ void cuda_DecryptBuffer (unsigned __int8 *buf, TC_LARGEST_COMPILER_UI
 //	{
 //		ks -= CipherGetKeyScheduleSize (cipher);
 //		ks2 -= CipherGetKeyScheduleSize (cipher);
-		cuda_DecryptBufferXTS (buf, len, &dataUnitNo, 0, cryptoInfo->ks, cryptoInfo->ks2, AES);
+		cuDecryptBufferXTS (buf, len, &dataUnitNo, 0, cryptoInfo->ks, cryptoInfo->ks2, cryptoInfo->ea);
 //	}
 }
 
-/* Return values: 0 = success, ERR_CIPHER_INIT_FAILURE (fatal), ERR_CIPHER_INIT_WEAK_KEY (non-fatal) */
-__device__ int cuda_CipherInit (int cipher, unsigned char *key, unsigned __int8 *ks)
-{
-    int retVal = ERR_SUCCESS;
-	switch (cipher)
-	{
-		case AES:
-    if (aes_encrypt_key256 (key, (aes_encrypt_ctx *) ks) != EXIT_SUCCESS)
-        return ERR_CIPHER_INIT_FAILURE;
 
-    if (aes_decrypt_key256 (key, (aes_decrypt_ctx *) (ks + sizeof(aes_encrypt_ctx))) != EXIT_SUCCESS)
-        return ERR_CIPHER_INIT_FAILURE;
-			break;
-			
-		case SERPENT:
-			//serpent_set_key (key, CipherGetKeySize(SERPENT) * 8, ks);
-			break;
-			
-		case TWOFISH:
-			//twofish_set_key ((TwofishInstance *)ks, (const u4byte *)key, CipherGetKeySize(TWOFISH) * 8);
-			break;
-		default:
-			// Unknown/wrong cipher ID
-			return ERR_CIPHER_INIT_FAILURE;
-	}
-    return retVal;
-}
-
-// Return values: 0 = success, ERR_CIPHER_INIT_FAILURE (fatal), ERR_CIPHER_INIT_WEAK_KEY (non-fatal)
-__device__ int cuda_EAInit (int ea, unsigned char *key, unsigned __int8 *ks)
-{
-    int c, retVal = ERR_SUCCESS;
-
-    if (ea == 0)
-        return ERR_CIPHER_INIT_FAILURE;
-    c=AES;
-    //for (c = EAGetFirstCipher (ea); c != 0; c = EAGetNextCipher (ea, c))
-    //{
-    switch (cuda_CipherInit (c, key, ks))
-    {
-    case ERR_CIPHER_INIT_FAILURE:
-        return ERR_CIPHER_INIT_FAILURE;
-
-    case ERR_CIPHER_INIT_WEAK_KEY:
-        retVal = ERR_CIPHER_INIT_WEAK_KEY;              // Non-fatal error
-        break;
-    }
-
-    //key += CipherGetKeySize (c);
-    //ks += CipherGetKeyScheduleSize (c);
-    //}
-    return retVal;
-}
-
-
-__device__ BOOL cuda_EAInitMode (PCRYPTO_INFO ci)
-{
-	switch (ci->mode)
-	{
-	case XTS:
-		// Secondary key schedule
-		if (cuda_EAInit (ci->ea, ci->km2, ci->ks2) != ERR_SUCCESS)
-			return FALSE;
-
-		/* Note: XTS mode could potentially be initialized with a weak key causing all blocks in one data unit
-		on the volume to be tweaked with zero tweaks (i.e. 512 bytes of the volume would be encrypted in ECB
-		mode). However, to create a TrueCrypt volume with such a weak key, each human being on Earth would have
-		to create approximately 11,378,125,361,078,862 (about eleven quadrillion) TrueCrypt volumes (provided 
-		that the size of each of the volumes is 1024 terabytes). */
-		break;
-	default:		
-		// Unknown/wrong ID
-		TC_THROW_FATAL_EXCEPTION;
-	}
-	return TRUE;
-}
-
-
-
-
-__device__ int cuda_Xts(unsigned char *encryptedHeader, unsigned char *headerKey, unsigned char *header) {
+__device__ int cuXts(int encryptionAlgorithm, unsigned char *encryptedHeader, unsigned char *headerKey, unsigned char *header) {
 
     PCRYPTO_INFO cryptoInfo;
     CRYPTO_INFO cryptoInfo_struct;
@@ -430,43 +299,46 @@ __device__ int cuda_Xts(unsigned char *encryptedHeader, unsigned char *headerKey
         return ERR_OUT_OF_MEMORY;
 
 
+	
     // Support only XTS
     cryptoInfo->mode= XTS ;
-    cryptoInfo->ea=AES;
+	if(encryptionAlgorithm!=AES && encryptionAlgorithm!=SERPENT && encryptionAlgorithm!=TWOFISH)
+		return ERR_CIPHER_INIT;
+	cryptoInfo->ea=encryptionAlgorithm;
 
-    status = cuda_EAInit (cryptoInfo->ea, headerKey + primaryKeyOffset, cryptoInfo->ks);
+    status = cuEAInit (cryptoInfo->ea, headerKey + primaryKeyOffset, cryptoInfo->ks);
     if (status == ERR_CIPHER_INIT_FAILURE)
         return ERR_CIPHER_INIT;
     // Init objects related to the mode of operation
 
     // Copy the secondary key (if cascade, multiple concatenated)
     //memcpy (cryptoInfo->km2, headerKey + EAGetKeySize (cryptoInfo->ea), EAGetKeySize (cryptoInfo->ea));
-    cuda_memcpy (cryptoInfo->km2, headerKey + 32, 32);
+    memcpy (cryptoInfo->km2, headerKey + 32, 32);
     // Secondary key schedule
-    if (!cuda_EAInitMode (cryptoInfo)) {
+    if (!cuEAInitMode (cryptoInfo)) {
         return ERR_MODE_INIT;
     }
  
     // Copy the header for decryption
-    cuda_memcpy (header, encryptedHeader, 512*sizeof(unsigned char));
+    memcpy (header, encryptedHeader, 512*sizeof(unsigned char));
 
     // Try to decrypt header
-    cuda_DecryptBuffer (header + HEADER_ENCRYPTED_DATA_OFFSET, HEADER_ENCRYPTED_DATA_SIZE, cryptoInfo);
+    cuDecryptBuffer (header + HEADER_ENCRYPTED_DATA_OFFSET, HEADER_ENCRYPTED_DATA_SIZE, cryptoInfo);
    
     
             // Magic 'TRUE'
-            if (cuda_GetHeaderField32 (header, TC_HEADER_OFFSET_MAGIC) != 0x54525545)
+            if (cuGetHeaderField32 (header, TC_HEADER_OFFSET_MAGIC) != 0x54525545)
                 return ERR_MAGIC_TRUE;
 
             // Header version
-            headerVersion = cuda_GetHeaderField16 (header, TC_HEADER_OFFSET_VERSION);
+            headerVersion = cuGetHeaderField16 (header, TC_HEADER_OFFSET_VERSION);
             if (headerVersion > VOLUME_HEADER_VERSION) {
                 return ERR_VERSION_REQUIRED;
             }
 
             // Check CRC of the header fields
             if (headerVersion >= 4
-                    && cuda_GetHeaderField32 (header, TC_HEADER_OFFSET_HEADER_CRC) != cuda_GetCrc32 (header + TC_HEADER_OFFSET_MAGIC, TC_HEADER_OFFSET_HEADER_CRC - TC_HEADER_OFFSET_MAGIC))
+                    && cuGetHeaderField32 (header, TC_HEADER_OFFSET_HEADER_CRC) != cuGetCrc32 (header + TC_HEADER_OFFSET_MAGIC, TC_HEADER_OFFSET_HEADER_CRC - TC_HEADER_OFFSET_MAGIC))
                 //printf("Unsuccessful\n");
                 return ERR_CRC_HEADER_FIELDS;
             // Required program version
@@ -474,7 +346,7 @@ __device__ int cuda_Xts(unsigned char *encryptedHeader, unsigned char *headerKey
             //cryptoInfo->LegacyVolume = cryptoInfo->RequiredProgramVersion < 0x600;
 
             // Check CRC of the key set
-            if (cuda_GetHeaderField32 (header, TC_HEADER_OFFSET_KEY_AREA_CRC) != cuda_GetCrc32 (header + HEADER_MASTER_KEYDATA_OFFSET, MASTER_KEYDATA_SIZE))
+            if (cuGetHeaderField32 (header, TC_HEADER_OFFSET_KEY_AREA_CRC) != cuGetCrc32 (header + HEADER_MASTER_KEYDATA_OFFSET, MASTER_KEYDATA_SIZE))
                 return ERR_CRC_KEY_SET;
  
     return SUCCESS;

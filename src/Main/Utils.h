@@ -24,6 +24,8 @@
 #include "Tcdefs.h"
 
 #define MAXWORDSIZE	64
+#define TC_VOLUME_HEADER_OFFSET			0
+#define TC_VOLUME_HEADER_EFFECTIVE_SIZE	512
 
 FILE *file_open ( char *wordPath);
 int file_close (FILE *fp);

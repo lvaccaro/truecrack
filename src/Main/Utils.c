@@ -36,17 +36,9 @@
 #include <sys/mount.h>
 #include <time.h>
 
-#include "Volumes.h"
 #include "Tcdefs.h"
 #include "Utils.h"
-#include "Crypto.h"
 
-//#ifdef _GPU_
-//#include "CudaPkcs5.cuh"
-//#else
-#include "Pkcs5.h"
-#include "CpuAes.h"
-//#endif
 
 FILE *file_open (char *wordPath) {
     int i;

@@ -82,7 +82,7 @@
 
 #include <string.h>     /* for memcpy() etc.        */
 
-#include "cuSha2.cuh"
+#include "Sha2.cuh"
 
 #if defined(__cplusplus)
 extern "C"
@@ -157,11 +157,11 @@ extern "C"
 /* FIPS-180, different variables are 'rotated' on each round, returning     */
 /* to their starting positions every eight rounds                           */
 
-#define q(n)  v##n
+#define qq(n)  v##n
 
 #define one_cycle(a,b,c,d,e,f,g,h,k,w)  \
-    q(h) += s_1(q(e)) + ch(q(e), q(f), q(g)) + k + w; \
-    q(d) += q(h); q(h) += s_0(q(a)) + maj(q(a), q(b), q(c))
+    qq(h) += s_1(qq(e)) + ch(qq(e), qq(f), qq(g)) + k + w; \
+    qq(d) += qq(h); qq(h) += s_0(qq(a)) + maj(qq(a), qq(b), qq(c))
 
 /* SHA256 mixing data   */
 

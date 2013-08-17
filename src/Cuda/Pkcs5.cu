@@ -17,198 +17,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
-#include "CudaPkcs5.cuh"
+#include "Pkcs5.cuh"
 
-
-
-__device__ void cuda_hmac_ripemd160 (unsigned char *key, int keylen, unsigned char *input, int len, unsigned char *digest, SupportPkcs5 *sup)
-{
-  
-    
-
-    int i;
-    // If the key is longer than the hash algorithm block size,
-    //	   let key = ripemd160(key), as per HMAC specifications. 
-    if (keylen > RIPEMD160_BLOCKSIZE) 
-	{
-	  //RMD160Init(&tctx);
-        //RMD160Update(&tctx, (const unsigned char *) key, keylen);
-        //RMD160Final(tk, &tctx);
-	cuda_RMD160(&sup->ctctx,(unsigned char *) key, keylen,(unsigned char *)NULL,0,sup->ctk);
-    
-        key = (unsigned char *) sup->ctk;
-        keylen = RIPEMD160_DIGESTSIZE;
-
-	//burn (&ctctx, sizeof(ctctx));	// Prevent leaks
-    }
-
-	/*
-
-	RMD160(K XOR opad, RMD160(K XOR ipad, text))
-
-	where K is an n byte key
-	ipad is the byte 0x36 repeated RIPEMD160_BLOCKSIZE times
-	opad is the byte 0x5c repeated RIPEMD160_BLOCKSIZE times
-	and text is the data being protected */
-
-
-    /* start out by storing key in pads */
-    // XOR key with ipad and opad values 
-
-    for (i=0; i<sizeof(sup->cpad); i++) 
-	sup->cpad[i]=0x36;
-    for (i=0; i<keylen; i++)
-        sup->cpad[i] ^= key[i];
-   
-    cuda_RMD160(&sup->ccontext,sup->cpad,RIPEMD160_BLOCKSIZE,(const unsigned char *) input, len, (unsigned char *) digest);
-   
-    for (i=0; i<sizeof(sup->cpad); i++) 
-	sup->cpad[i]=0x5c; 
-    for (i=0; i<keylen; i++) 
-	sup->cpad[i] ^= key[i];
-    cuda_RMD160(&sup->ccontext,sup->cpad,RIPEMD160_BLOCKSIZE,(const unsigned char *) digest, RIPEMD160_DIGESTSIZE, (unsigned char *) digest);
-   
-
-    // perform inner RIPEMD-160
-
-    //RMD160Init(&context);           // init context for 1st pass
-    //RMD160Update(&context, k_ipad, RIPEMD160_BLOCKSIZE);  // start with inner pad
-    //RMD160Update(&context, (const unsigned char *) input, len); // then text of datagram 
-    //RMD160Final((unsigned char *) digest, &context);         // finish up 1st pass 
-    //cuda_RMD160(&ccontext,ck_ipad,RIPEMD160_BLOCKSIZE,(const unsigned char *) input, len, (unsigned char *) digest);
-   
-    // perform outer RIPEMD-160 
-    //RMD160Init(&context);           // init context for 2nd pass 
-    //RMD160Update(&context, k_opad, RIPEMD160_BLOCKSIZE);  // start with outer pad 
-    // results of 1st hash 
-    //RMD160Update(&context, (const unsigned char *) digest, RIPEMD160_DIGESTSIZE);
-    //RMD160Final((unsigned char *) digest, &context);         // finish up 2nd pass 
-    //cuda_RMD160(&ccontext,ck_opad,RIPEMD160_BLOCKSIZE,(const unsigned char *) digest, RIPEMD160_DIGESTSIZE, (unsigned char *) digest);
-   
-	// Prevent possible leaks. 
-	//burn (ck_ipad, sizeof(ck_ipad));
-	//burn (ck_opad, sizeof(ck_opad));
-	//burn (ctk, sizeof(ctk));
-	//burn (&ccontext, sizeof(ccontext));
-}
-
-
-__device__ void cuda_Pbkdf2_ ( unsigned char *salt, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, unsigned char *headerkey, int numData, int numBlock) {
-	SupportPkcs5 support;
-	SupportPkcs5 *sup;
-	sup = &support;
-	
-	//INCLUDE: void derive_u_ripemd160 (char *pwd, int pwd_len, char *salt, int salt_len, int iterations, char *u, int b)
-	unsigned char *pwd;
-	int pwd_len;
-	int c, i;
-		
-	pwd=blockPwd+blockPwd_init[numData];
-	pwd_len = blockPwd_length[numData];
-	
-	
-	int b=numBlock;
-	unsigned char *u=headerkey+RIPEMD160_DIGESTSIZE*b;
-
-	// iteration 1 
-	memset (sup->ccounter, 0, 4);
-	sup->ccounter[3] = (char) b+1;
-	memcpy (sup->cinit, salt, SALT_LENGTH);	// salt 
-	memcpy (&sup->cinit[SALT_LENGTH],sup->ccounter, 4);	// big-endian block number 
-	
-	cuda_hmac_ripemd160 (pwd, pwd_len, sup->cinit, SALT_LENGTH + 4, sup->cj, sup);
-	memcpy (u, sup->cj, RIPEMD160_DIGESTSIZE);
-	
-	//remaining iterations 
-	for (c = 1; c < ITERATIONS; c++)
-	{
-		cuda_hmac_ripemd160 (pwd, pwd_len, sup->cj, RIPEMD160_DIGESTSIZE, sup->ck,sup);
-		for (i = 0; i < RIPEMD160_DIGESTSIZE; i++)
-		{
-			u[i] ^= sup->ck[i];
-			sup->cj[i] = sup->ck[i];
-		}
-	}
-  
-}
 
 /*
-__device__ void cuda_Pbkdf2 ( unsigned char *salt, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, unsigned char *headerkey, int numData) {
-	SupportPkcs5 support;
-	SupportPkcs5 *sup;
-	sup = &support;
-	int numBlock=0;
-	unsigned char *pwd;
-	int pwd_len;
-	int c, i;
-		
-	pwd=blockPwd+blockPwd_init[numData];
-	pwd_len = blockPwd_length[numData];
-	
-	for(numBlock=0;numBlock<10;numBlock++){
-		//  cuda_Pbkdf2 (salt, blockPwd, blockPwd_init, blockPwd_length, headerkey, numData, i);
-		
-		//INCLUDE: void derive_u_ripemd160 (char *pwd, int pwd_len, char *salt, int salt_len, int iterations, char *u, int b)		
-		int b=numBlock;
-		unsigned char *u=headerkey+RIPEMD160_DIGESTSIZE*b;
-
-		// iteration 1 
-		memset (sup->ccounter, 0, 4);
-		sup->ccounter[3] = (char) b+1;
-		memcpy (sup->cinit, salt, SALT_LENGTH);	// salt 
-		memcpy (&sup->cinit[SALT_LENGTH],sup->ccounter, 4);	// big-endian block number 
-		
-		cuda_hmac_ripemd160 (pwd, pwd_len, sup->cinit, SALT_LENGTH + 4, sup->cj, sup);
-		memcpy (u, sup->cj, RIPEMD160_DIGESTSIZE);
-		
-		//remaining iterations 
-		for (c = 1; c < ITERATIONS; c++)
-		{
-			cuda_hmac_ripemd160 (pwd, pwd_len, sup->cj, RIPEMD160_DIGESTSIZE, sup->ck,sup);
-			for (i = 0; i < RIPEMD160_DIGESTSIZE; i++)
-			{
-				u[i] ^= sup->ck[i];
-				sup->cj[i] = sup->ck[i];
-			}
-		}
-	}
-}
-*/
-__device__ void cuda_Pbkdf2_charset_ ( unsigned char *salt, unsigned char *pwd, int pwd_len, unsigned char *headerkey) {
-	SupportPkcs5 support;
-	SupportPkcs5 *sup;
-	sup = &support;
-	int numBlock=0;
-	int c, i;
-
-	for(numBlock=0;numBlock<10;numBlock++){
-		//  cuda_Pbkdf2 (salt, blockPwd, blockPwd_init, blockPwd_length, headerkey, numData, i);
-		
-		//INCLUDE: void derive_u_ripemd160 (char *pwd, int pwd_len, char *salt, int salt_len, int iterations, char *u, int b)		
-		int b=numBlock;
-		unsigned char *u=headerkey+RIPEMD160_DIGESTSIZE*b;
-
-		// iteration 1 
-		memset (sup->ccounter, 0, 4);
-		sup->ccounter[3] = (char) b+1;
-		memcpy (sup->cinit, salt, SALT_LENGTH);	// salt 
-		memcpy (&sup->cinit[SALT_LENGTH],sup->ccounter, 4);	// big-endian block number 
-		
-		cuda_hmac_ripemd160 (pwd, pwd_len, sup->cinit, SALT_LENGTH + 4, sup->cj, sup);
-		memcpy (u, sup->cj, RIPEMD160_DIGESTSIZE);
-		
-		//remaining iterations 
-		for (c = 1; c < ITERATIONS; c++)
-		{
-			cuda_hmac_ripemd160 (pwd, pwd_len, sup->cj, RIPEMD160_DIGESTSIZE, sup->ck,sup);
-			for (i = 0; i < RIPEMD160_DIGESTSIZE; i++)
-			{
-				u[i] ^= sup->ck[i];
-				sup->cj[i] = sup->ck[i];
-			}
-		}
-	}
-}
 __device__ void cuda_Pbkdf2 ( unsigned char *salt, unsigned char *pwd, int pwd_len, unsigned char *headerkey) {
 	SupportPkcs5 support;
 	SupportPkcs5 *sup;
@@ -243,8 +55,178 @@ __device__ void cuda_Pbkdf2 ( unsigned char *salt, unsigned char *pwd, int pwd_l
 			}
 		}
 	}
+}*/
+
+__device__ void cuda_hmac_ripemd160 (unsigned char *key, int keylen, unsigned char *input, int len, unsigned char *digest)
+{
+    SupportPkcs5 support;
+	SupportPkcs5 *sup=&support;
+    int i;
+    // If the key is longer than the hash algorithm block size,
+    //	   let key = ripemd160(key), as per HMAC specifications.
+    if (keylen > RIPEMD160_BLOCKSIZE)
+	{
+		//RMD160Init(&tctx);
+        //RMD160Update(&tctx, (const unsigned char *) key, keylen);
+        //RMD160Final(tk, &tctx);
+		cuda_RMD160(&sup->ctctx,(unsigned char *) key, keylen,(unsigned char *)NULL,0,sup->ctk);
+        key = (unsigned char *) sup->ctk;
+        keylen = RIPEMD160_DIGESTSIZE;
+		//burn (&ctctx, sizeof(ctctx));	// Prevent leaks
+    }
+	 /*
+	 RMD160(K XOR opad, RMD160(K XOR ipad, text))
+	 where K is an n byte key
+	 ipad is the byte 0x36 repeated RIPEMD160_BLOCKSIZE times
+	 opad is the byte 0x5c repeated RIPEMD160_BLOCKSIZE times
+	 and text is the data being protected*/
+	 // start out by storing key in pads
+	 // XOR key with ipad and opad values
+	 for (i=0; i<sizeof(sup->cpad); i++)
+		 sup->cpad[i]=0x36;
+	 for (i=0; i<keylen; i++)
+		 sup->cpad[i] ^= key[i];
+	 
+	 cuda_RMD160(&sup->ccontext,sup->cpad,RIPEMD160_BLOCKSIZE,(const unsigned char *) input, len, (unsigned char *) digest);
+	 
+	 for (i=0; i<sizeof(sup->cpad); i++)
+		 sup->cpad[i]=0x5c;
+	 for (i=0; i<keylen; i++)
+		 sup->cpad[i] ^= key[i];
+	 cuda_RMD160(&sup->ccontext,sup->cpad,RIPEMD160_BLOCKSIZE,(const unsigned char *) digest, RIPEMD160_DIGESTSIZE, (unsigned char *) digest);
+	 
+}
+/*
+__device__ void cuda_hmac_ripemd160 (unsigned char *key, int keylen, unsigned char *input, int len, unsigned char *digest)
+{
+    RMD160_CTX context;
+    unsigned char k_ipad[65];  //inner padding - key XORd with ipad 
+    unsigned char k_opad[65];  //outer padding - key XORd with opad
+    unsigned char tk[RIPEMD160_DIGESTSIZE];
+    int i;
+	
+    // If the key is longer than the hash algorithm block size, let key = ripemd160(key), as per HMAC specifications. 
+    if (keylen > RIPEMD160_BLOCKSIZE)
+	{
+        RMD160_CTX      tctx;
+		
+        RMD160Init(&tctx);
+        RMD160Update(&tctx, (const unsigned char *) key, keylen);
+        RMD160Final(tk, &tctx);
+		
+        key = ( unsigned char *) tk;
+        keylen = RIPEMD160_DIGESTSIZE;
+		
+		burn (&tctx, sizeof(tctx));	// Prevent leaks
+    }
+	
+	/*
+	 
+	 RMD160(K XOR opad, RMD160(K XOR ipad, text))
+	 
+	 where K is an n byte key
+	 ipad is the byte 0x36 repeated RIPEMD160_BLOCKSIZE times
+	 opad is the byte 0x5c repeated RIPEMD160_BLOCKSIZE times
+	 and text is the data being protected 
+	
+	
+	// start out by storing key in pads
+	memset(k_ipad, 0x36, sizeof(k_ipad));
+    memset(k_opad, 0x5c, sizeof(k_opad));
+	
+    // XOR key with ipad and opad values
+    for (i=0; i<keylen; i++)
+	{
+        k_ipad[i] ^= key[i];
+        k_opad[i] ^= key[i];
+    }
+	
+    //perform inner RIPEMD-160
+	
+    RMD160Init(&context);           // init context for 1st pass
+    RMD160Update(&context, k_ipad, RIPEMD160_BLOCKSIZE);  // start with inner pad
+    RMD160Update(&context, (const unsigned char *) input, len); // then text of datagram
+    RMD160Final((unsigned char *) digest, &context);         // finish up 1st pass
+	
+    // perform outer RIPEMD-160
+    RMD160Init(&context);           // init context for 2nd pass
+    RMD160Update(&context, k_opad, RIPEMD160_BLOCKSIZE);  // start with outer pad 
+    // results of 1st hash
+    RMD160Update(&context, (const unsigned char *) digest, RIPEMD160_DIGESTSIZE);
+    RMD160Final((unsigned char *) digest, &context);         // finish up 2nd pass
+	
+	// Prevent possible leaks. 
+    burn (k_ipad, sizeof(k_ipad));
+    burn (k_opad, sizeof(k_opad));
+	burn (tk, sizeof(tk));
+	burn (&context, sizeof(context));
+}
+*/
+
+__device__ void cuda_derive_u_ripemd160 (unsigned char *pwd, int pwd_len, unsigned char *salt, int salt_len, int iterations, unsigned char *u, int b)
+{
+	unsigned char j[RIPEMD160_DIGESTSIZE], k[RIPEMD160_DIGESTSIZE];
+	unsigned char init[128];
+	unsigned char counter[4];
+	int c, i;
+	
+	/* iteration 1 */
+	memset (counter, 0, 4);
+	counter[3] = (char) b;
+	memcpy (init, salt, salt_len);	/* salt */
+	memcpy (&init[salt_len], counter, 4);	/* big-endian block number */
+	cuda_hmac_ripemd160 (pwd, pwd_len, init, salt_len + 4, j);
+	memcpy (u, j, RIPEMD160_DIGESTSIZE);
+	
+	/* remaining iterations */
+	for (c = 1; c < iterations; c++)
+	{
+		cuda_hmac_ripemd160 (pwd, pwd_len, j, RIPEMD160_DIGESTSIZE, k);
+		for (i = 0; i < RIPEMD160_DIGESTSIZE; i++)
+		{
+			u[i] ^= k[i];
+			j[i] = k[i];
+		}
+	}
+	
+	/* Prevent possible leaks. */
+	burn (j, sizeof(j));
+	burn (k, sizeof(k));
 }
 
+
+__device__ void cuda_derive_key_ripemd160 (unsigned char *pwd, int pwd_len, unsigned char *salt, int salt_len, int iterations, unsigned char *dk, int dklen)
+{
+	unsigned char u[RIPEMD160_DIGESTSIZE];
+	int b, l, r;
+	
+	if (dklen % RIPEMD160_DIGESTSIZE)
+	{
+		l = 1 + dklen / RIPEMD160_DIGESTSIZE;
+	}
+	else
+	{
+		l = dklen / RIPEMD160_DIGESTSIZE;
+	}
+	
+	r = dklen - (l - 1) * RIPEMD160_DIGESTSIZE;
+	
+	// first l - 1 blocks 
+	for (b = 1; b < l; b++)
+	{
+		cuda_derive_u_ripemd160 (pwd, pwd_len, salt, salt_len, iterations, u, b);
+		memcpy (dk, u, RIPEMD160_DIGESTSIZE);
+		dk += RIPEMD160_DIGESTSIZE;
+	}
+	
+	// last block
+	cuda_derive_u_ripemd160 (pwd, pwd_len, salt, salt_len, iterations, u, b);
+	memcpy (dk, u, r);
+	
+	// Prevent possible leaks. 
+	burn (u, sizeof(u));
+	
+}
 
 
 
@@ -313,9 +295,9 @@ __device__ void cuda_hmac_sha512
 
 	/* Pad the key for inner digest */
 	for (i = 0; i < lk; ++i)
-		buf[i] = (char) (k[i] ^ 0x36);
+		buf[i] = (unsigned char) (k[i] ^ 0x36);
 	for (i = lk; i < SHA512_BLOCKSIZE; ++i)
-		buf[i] = 0x36;
+		buf[i] = (unsigned char) 0x36;
 
 	sha512_hash ((unsigned char *) buf, SHA512_BLOCKSIZE, &ictx);
 	sha512_hash ((unsigned char *) d, ld, &ictx);
@@ -327,9 +309,9 @@ __device__ void cuda_hmac_sha512
 	sha512_begin (&octx);
 
 	for (i = 0; i < lk; ++i)
-		buf[i] = (char) (k[i] ^ 0x5C);
+		buf[i] = (unsigned char) (k[i] ^ 0x5C);
 	for (i = lk; i < SHA512_BLOCKSIZE; ++i)
-		buf[i] = 0x5C;
+		buf[i] = (unsigned char) 0x5C;
 
 	sha512_hash ((unsigned char *) buf, SHA512_BLOCKSIZE, &octx);
 	sha512_hash ((unsigned char *) isha, SHA512_DIGESTSIZE, &octx);
@@ -461,9 +443,9 @@ __device__ void cuda_hmac_whirlpool
 
 	/* Pad the key for inner digest */
 	for (i = 0; i < lk; ++i)
-		buf[i] = (char) (k[i] ^ 0x36);
+		buf[i] = (unsigned char) (k[i] ^ 0x36);
 	for (i = lk; i < WHIRLPOOL_BLOCKSIZE; ++i)
-		buf[i] = 0x36;
+		buf[i] = (unsigned char) 0x36;
 
 	WHIRLPOOL_add ((unsigned char *) buf, WHIRLPOOL_BLOCKSIZE * 8, &ictx);
 	WHIRLPOOL_add ((unsigned char *) d, ld * 8, &ictx);
@@ -475,9 +457,9 @@ __device__ void cuda_hmac_whirlpool
 	WHIRLPOOL_init (&octx);
 
 	for (i = 0; i < lk; ++i)
-		buf[i] = (char) (k[i] ^ 0x5C);
+		buf[i] = (unsigned char) (k[i] ^ 0x5C);
 	for (i = lk; i < WHIRLPOOL_BLOCKSIZE; ++i)
-		buf[i] = 0x5C;
+		buf[i] = (unsigned char) 0x5C;
 
 	WHIRLPOOL_add ((unsigned char *) buf, WHIRLPOOL_BLOCKSIZE * 8, &octx);
 	WHIRLPOOL_add ((unsigned char *) iwhi, WHIRLPOOL_DIGESTSIZE * 8, &octx);

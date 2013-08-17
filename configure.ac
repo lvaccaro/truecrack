@@ -57,9 +57,9 @@ then
    CUDA_LDFLAGS="-L$with_cuda/lib"
    NVCC="$with_cuda/bin/nvcc"
 else
-   CUDA_CFLAGS="-I/usr/local/cuda-5.0/include"
-   CUDA_LIBS="-L/usr/local/cuda-5.0/lib"
-   CUDA_LDFLAGS="-L/usr/local/cuda-5.0/lib"
+   CUDA_CFLAGS="-I/usr/local/cuda/include"
+   CUDA_LIBS="-L/usr/local/cuda/lib"
+   CUDA_LDFLAGS="-L/usr/local/cuda/lib"
    NVCC="nvcc"
 fi
 AC_ARG_ENABLE([debug],

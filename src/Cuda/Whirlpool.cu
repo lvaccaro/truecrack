@@ -63,7 +63,7 @@
 #include <string.h>
 #include <time.h>
 
-#include "cuWhirlpool.cuh"
+#include "Whirlpool.cuh"
 
 /* #define TRACE_INTERMEDIATE_VALUES */
 

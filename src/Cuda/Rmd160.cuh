@@ -1,5 +1,6 @@
 /*
  * Copyright (C)  2011  Luca Vaccaro
+ * Based on TrueCrypt, freely available at http://www.truecrypt.org/
  *
  * TrueCrack is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -16,30 +17,36 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
+#ifndef TC_HEADER_Crypto_Ripemd160
+#define TC_HEADER_Crypto_Ripemd160
 
-#ifndef TC_HEADER_CUDACORE
-#define TC_HEADER_CUDACORE
-
-
-#define PASSWORD_MAXSIZE	32
-#define SALT_LENGTH 		64
-#define ITERATIONS		2000
+#include "Common/Tcdefs.h"
 
 #if defined(__cplusplus)
 extern "C"
 {
 #endif
 
+#define RIPEMD160_BLOCK_LENGTH 64
 
+typedef struct RMD160Context
+{
+	unsigned __int32 state[5];
+#ifndef TC_WINDOWS_BOOT
+	uint64 count;
+#else
+	uint16 count;
+#endif
+	unsigned char buffer[RIPEMD160_BLOCK_LENGTH];
+} RMD160_CTX;
 
-int getMultiprocessorCount (void);
-void cuda_Init (int block_maxsize, unsigned char *salt, unsigned char *header);
-void cuda_Set (	int block_currentsize, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result);
-void cuda_Free(void);
-float cuda_Core_dictionary ( int block_currentsize, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result, int keyDerivationFunction);
-float cuda_Core_charset ( uint64_t bsize, uint64_t isize, unsigned short int charset_length, unsigned char *charset, unsigned short int password_length, short int *result, int keyDerivationFunction) ;
+__device__ void RMD160Init (RMD160_CTX *ctx);
+__device__ void RMD160Transform (unsigned __int32 *state, const unsigned __int32 *data);
+__device__ void RMD160Update (RMD160_CTX *ctx, const unsigned char *input, unsigned __int32 len);
+__device__ void RMD160Final (unsigned char *digest, RMD160_CTX *ctx);
+
 #if defined(__cplusplus)
 }
 #endif
 
-#endif // TC_HEADER_CUDACORE
+#endif // TC_HEADER_Crypto_Ripemd160
