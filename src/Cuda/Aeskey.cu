@@ -46,7 +46,7 @@
 
 //#include "Aesopt.h"
 //#include "Aestab.h"
-#include "CudaAes.cuh"
+#include "Aes.cuh"
 
 
 /* Initialise the key schedule from the user supplied key. The key

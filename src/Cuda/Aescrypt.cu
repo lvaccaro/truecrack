@@ -46,7 +46,7 @@
 
 //#include "Aesopt.h"
 //#include "Aestab.h"
-#include "CudaAes.cuh"
+#include "Aes.cuh"
 
 
 #define si(y,x,k,c) (s(y,c) = word_in(x, c) ^ (k)[c])

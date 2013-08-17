@@ -36,9 +36,13 @@
 #include "Pkcs5.h"
 #include "CpuAes.h"
 
+#include "Serpent.h"
+#include "Twofish.h"
+
+
 enum
 {
-    UNDEFINED,
+    UNDEFINED=0,
     SUCCESS,
     ERR_OUT_OF_MEMORY,
     ERR_CIPHER_INIT,
@@ -61,7 +65,7 @@ int cpu_GetMaxPkcs5OutSize (void)
 
 
 
-int cpu_Core_charset(unsigned char *encryptedHeader, unsigned char *CORE_charset, unsigned char *word, int wordlength, int keyDerivationFunction) {
+int cpu_Core_charset(int encryptionAlgorithm,unsigned char *encryptedHeader, unsigned char *CORE_charset, unsigned char *word, int wordlength, int keyDerivationFunction) {
     // PKCS5 is used to derive the primary header key(s) and secondary header key(s) (XTS mode) from the password
     int i,j,value=-1,found;
     unsigned char salt[PKCS5_SALT_SIZE];
@@ -85,7 +89,7 @@ int cpu_Core_charset(unsigned char *encryptedHeader, unsigned char *CORE_charset
     		return;
     	}
   
-	value=cpu_Xts(encryptedHeader,headerKey,cpu_GetMaxPkcs5OutSize(), masterKey, &length);
+	value=cpu_Xts(encryptionAlgorithm,encryptedHeader,headerKey,cpu_GetMaxPkcs5OutSize(), masterKey, &length);
 			
 	if (value==SUCCESS)
 		return 1;
@@ -94,7 +98,7 @@ int cpu_Core_charset(unsigned char *encryptedHeader, unsigned char *CORE_charset
 
 
 
-void cpu_Core_dictionary(int blocksize, unsigned char *encryptedHeader, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result, int keyDerivationFunction) {
+void cpu_Core_dictionary(int encryptionAlgorithm, int blocksize, unsigned char *encryptedHeader, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result, int keyDerivationFunction) {
     // PKCS5 is used to derive the primary header key(s) and secondary header key(s) (XTS mode) from the password
     int i,j,value=-1,found;
     unsigned char salt[PKCS5_SALT_SIZE];
@@ -116,62 +120,16 @@ void cpu_Core_dictionary(int blocksize, unsigned char *encryptedHeader, unsigned
     		return;
     	}
 
-        value=cpu_Xts(encryptedHeader,headerKey,cpu_GetMaxPkcs5OutSize(), NULL, NULL);
-
-	result[i]=NOMATCH;
-	if (value==SUCCESS) {
-	    result[i]=MATCH;
-	    found=1;
-        }
+		for (j=0;j<cpu_GetMaxPkcs5OutSize();j++)
+			printf("%02x",headerKey[j]);
+		printf("\n");
+		
+        result[i]=cpu_Xts(encryptionAlgorithm,encryptedHeader,headerKey,cpu_GetMaxPkcs5OutSize(), NULL, NULL);
+		if (result[i]==SUCCESS)
+			found=1;
     }
 }
 
-// Converts a 64-bit unsigned integer (passed as two 32-bit integers for compatibility with non-64-bit
-// environments/platforms) into a little-endian 16-byte array.
-void cpu_Uint64ToLE16ByteArray (unsigned __int8 *byteBuf, unsigned __int32 highInt32, unsigned __int32 lowInt32)
-{
-    unsigned __int32 *bufPtr32 = (unsigned __int32 *) byteBuf;
-
-    *bufPtr32++ = lowInt32;
-    *bufPtr32++ = highInt32;
-
-    // We're converting a 64-bit number into a little-endian 16-byte array so we can zero the last 8 bytes
-    *bufPtr32++ = 0;
-    *bufPtr32 = 0;
-}
-
-void cpu_EncipherBlock(int cipher, void *data, void *ks)
-{
-    switch (cipher)
-    {
-    case AES:
-        // In 32-bit kernel mode, due to KeSaveFloatingPointState() overhead, AES instructions can be used only when processing the whole data unit.
-        aes_encrypt (data, data, ks);
-        break;
-
-    default:
-        TC_THROW_FATAL_EXCEPTION;	// Unknown/wrong ID
-    }
-}
-
-void cpu_DecipherBlock(int cipher, void *data, void *ks)
-{
-    switch (cipher)
-    {
-#ifndef TC_WINDOWS_BOOT
-
-    case AES:
-        aes_decrypt (data, data, (void *) ((char *) ks + sizeof(aes_encrypt_ctx)));
-        break;
-#else
-    case AES:
-        aes_decrypt (data, data, ks);
-        break;
-#endif
-    default:
-        TC_THROW_FATAL_EXCEPTION;	// Unknown/wrong ID
-    }
-}
 
 
 
@@ -339,72 +297,14 @@ void cpu_DecryptBuffer (unsigned __int8 *buf, TC_LARGEST_COMPILER_UINT len, PCRY
     dataUnitNo.LowPart = 0;
     dataUnitNo.HighPart = 0;
 
-    cpu_DecryptBufferXTS (buf, len, &dataUnitNo, 0, cryptoInfo->ks, cryptoInfo->ks2, AES);
+    cpu_DecryptBufferXTS (buf, len, &dataUnitNo, 0, cryptoInfo->ks, cryptoInfo->ks2, cryptoInfo->ea);
 }
 
-/* Return values: 0 = success, ERR_CIPHER_INIT_FAILURE (fatal), ERR_CIPHER_INIT_WEAK_KEY (non-fatal) */
-int cpu_CipherInit (int cipher, unsigned char *key, unsigned __int8 *ks)
-{
-    int retVal = ERR_SUCCESS;
-
-    switch (cipher)
-    {
-    case AES:
-#ifndef TC_WINDOWS_BOOT
-        if (aes_encrypt_key256 (key, (aes_encrypt_ctx *) ks) != EXIT_SUCCESS)
-            return ERR_CIPHER_INIT_FAILURE;
-
-        if (aes_decrypt_key256 (key, (aes_decrypt_ctx *) (ks + sizeof(aes_encrypt_ctx))) != EXIT_SUCCESS)
-            return ERR_CIPHER_INIT_FAILURE;
-#else
-        if (aes_set_key (key, (length_type) CipherGetKeySize(AES), (aes_context *) ks) != 0)
-            return ERR_CIPHER_INIT_FAILURE;
-#endif
-        break;
 
 
-    default:
-        // Unknown/wrong cipher ID
-        return ERR_CIPHER_INIT_FAILURE;
-    }
 
-    return retVal;
-}
 
-int cpu_EAInit (int ea, unsigned char *key, unsigned __int8 *ks)
-{
-    int c, retVal = ERR_SUCCESS;
-
-    if (ea == 0)
-        return ERR_CIPHER_INIT_FAILURE;
-    c=AES;
-    //for (c = EAGetFirstCipher (ea); c != 0; c = EAGetNextCipher (ea, c))
-    //{
-    switch (cpu_CipherInit (c, key, ks))
-    {
-    case ERR_CIPHER_INIT_FAILURE:
-        return ERR_CIPHER_INIT_FAILURE;
-
-    case ERR_CIPHER_INIT_WEAK_KEY:
-        retVal = ERR_CIPHER_INIT_WEAK_KEY;              // Non-fatal error
-        break;
-    }
-
-    //key += CipherGetKeySize (c);
-    //ks += CipherGetKeyScheduleSize (c);
-    //}
-    return retVal;
-}
-
-BOOL cpu_EAInitMode (PCRYPTO_INFO ci)
-{
-    // Secondary key schedule
-    if (cpu_EAInit (ci->ea, ci->km2, ci->ks2) != ERR_SUCCESS)
-        return FALSE;
-    return TRUE;
-}
-
-int cpu_Xts(char *encryptedHeader, char *headerKey, int headerKey_length, char *masterKey, int *masterKey_length) {
+int cpu_Xts(int encryptionAlgorithm, char *encryptedHeader, char *headerKey, int headerKey_length, char *masterKey, int *masterKey_length) {
     BOOL ReadVolumeHeaderRecoveryMode = FALSE;
     char header[TC_VOLUME_HEADER_EFFECTIVE_SIZE];
     PCRYPTO_INFO cryptoInfo;
@@ -424,10 +324,10 @@ int cpu_Xts(char *encryptedHeader, char *headerKey, int headerKey_length, char *
 
     // Support only XTS
     cryptoInfo->mode= XTS ;
-    cryptoInfo->ea=AES;
-
-    int blockSize;
-    blockSize = 16;
+	if(encryptionAlgorithm!=AES && encryptionAlgorithm!=SERPENT && encryptionAlgorithm!=TWOFISH)
+		return ERR_CIPHER_INIT;
+	cryptoInfo->ea=encryptionAlgorithm;
+	
     status = cpu_EAInit (cryptoInfo->ea, headerKey + primaryKeyOffset, cryptoInfo->ks);
     if (status == ERR_CIPHER_INIT_FAILURE)
         return ERR_CIPHER_INIT;
@@ -447,6 +347,10 @@ int cpu_Xts(char *encryptedHeader, char *headerKey, int headerKey_length, char *
     // Try to decrypt header
     cpu_DecryptBuffer (header + HEADER_ENCRYPTED_DATA_OFFSET, HEADER_ENCRYPTED_DATA_SIZE, cryptoInfo);
 
+	for (i=0;i<512;i++)
+		printf("%02x",(unsigned char)header[i]);
+	printf("\n");
+	
     // Magic 'TRUE'
     if (GetHeaderField32 (header, TC_HEADER_OFFSET_MAGIC) != 0x54525545)
         return ERR_MAGIC_TRUE;

@@ -52,7 +52,7 @@
 
 //#include "Aes.h"
 //#include "Aesopt.h"
-#include "CudaAes.cuh"
+#include "Aes.cuh"
 
 #if defined(FIXED_TABLES)
 

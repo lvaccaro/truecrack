@@ -17,22 +17,23 @@
  *
  */
 #include <string.h>
+#include <signal.h>
+#include <stdlib.h>
 #include "Utils.h"
-#include "Volumes.h"
 #include "Core.h"
+
 #include "Charset.h"
 #ifdef _GPU_
-#include "CudaCore.cuh"
-#include "CudaXts.cuh"
+#include "Core.cuh"
 #else
+#include "Volumes.h"
 #include "CpuCore.h"
 #endif
-#include <signal.h>
 
 /* Buffer with header */
 char header[512]={0};
 int header_length;
-unsigned char salt[PKCS5_SALT_SIZE];
+unsigned char salt[SALT_LENGTH];
 
 /* Password */
 unsigned char password[MAXWORDSIZE];
@@ -76,9 +77,26 @@ void core_close(void){
 }
 
 void core_init(void){
+	
+	//Check the truecrypt volume file
+	FILE *fp;
+	if ((fp=fopen(CORE_volumePath,"r"))==NULL){
+		printf("Error %s : No such file\n",CORE_volumePath);
+		exit(0);
+	}else
+		fclose(fp);
+	
+	if (CORE_typeAttack==ATTACK_DICTIONARY){
+		if ((fp=fopen(CORE_wordsPath,"r"))==NULL){
+			printf("Error %s : No such file\n",CORE_wordsPath);
+			exit(0);
+		}else
+			fclose(fp);
+	}
+	
 	//read the volume	
 	header_length = file_readHeader(CORE_volumePath,header,CORE_backup,CORE_hidden);
-	memcpy (salt, header + HEADER_SALT_OFFSET, PKCS5_SALT_SIZE);
+	memcpy (salt, header + HEADER_SALT_OFFSET, SALT_LENGTH);
 
 	if(CORE_verbose)
 		printf("\nMemory initialization...\n");
@@ -93,7 +111,7 @@ void core_init(void){
 	CORE_blocksize=1;
 #endif
 	block_size=CORE_blocksize;
-
+	
 	// Allocation of variables and structures
 	if (CORE_typeAttack==ATTACK_DICTIONARY){
 		blockPwd=malloc(CORE_blocksize*PASSWORD_MAXSIZE*sizeof(char));
@@ -182,10 +200,10 @@ void core(void){
 
 			// Calculate the hash header keys decrypt the encrypted header and check the right header key with cuda procedure
 			// PKCS5 is used to derive the primary header key(s) and secondary header key(s) (XTS mode) from the password
-			time=cuda_Core_dictionary (block_size,blockPwd, blockPwd_init, blockPwd_length, result, CORE_keyDerivationFunction);
+			time=cuda_Core_dictionary (CORE_encryptionAlgorithm,block_size,blockPwd, blockPwd_init, blockPwd_length, result, CORE_keyDerivationFunction);
 			
 			for (i=0;i<block_size && status!=1 ;i++) {
-				if(result[i]==MATCH)
+				if(result[i]==1)
 					status=1;
 			} 
 
@@ -197,16 +215,10 @@ void core(void){
 					printf("\t");
 					if (blockPwd_length[j]<=8)		
 						printf("\t");
-					switch(result[j]){
-						case MATCH: 
-							printf("YES\n");
-							break;
-						case NOMATCH:
-							printf("NO\n");
-							break;
-						default:
-							printf("ERROR\n");
-					}
+					if (result[j]==1)
+						printf("YES\n");
+					else
+						printf("NO\n");
 				}
 				printf("--- Performance: %g p/s, time: %.2g s, passwords: %d \n",block_size/(time/1000),time/1000,block_size);
 			}
@@ -247,9 +259,9 @@ void core(void){
 			if (block_size==0)
 				break;
 
-			cpu_Core_dictionary(1, header, blockPwd, blockPwd_init, blockPwd_length, result, CORE_keyDerivationFunction);
+			cpu_Core_dictionary(CORE_encryptionAlgorithm,1, header, blockPwd, blockPwd_init, blockPwd_length, result, CORE_keyDerivationFunction);
 			
-			if(result[0]==MATCH)
+			if(result[0]==1)
 				status=1;
 
 			if (CORE_verbose) {
@@ -259,16 +271,10 @@ void core(void){
 				printf("\t");
 				if (blockPwd_length[0]<=8)		
 					printf("\t");
-				switch(result[0]){
-					case MATCH: 
-						printf("YES\n");
-						break;
-					case NOMATCH:
-						printf("NO\n");
-						break;
-					default:
-						printf("ERROR\n");
-				}
+				if (result[0]==1)
+					printf("YES\n");
+				else
+					printf("NO\n");
 			}
 			count++;
 			iblock++;
@@ -345,10 +351,10 @@ void core(void){
 				restore=0;
 				//printf("iblock:%d / block_size:%d =>> %d / maxcombination: %d\n",iblock,(int)block_size,(int)offset,(int)maxcombination);
 
-				cuda_Core_charset ( block_size,offset, strlen(CORE_charset), CORE_charset, wordlength, result, CORE_keyDerivationFunction) ;
+				cuda_Core_charset ( CORE_encryptionAlgorithm, block_size,offset, strlen(CORE_charset), CORE_charset, wordlength, result, CORE_keyDerivationFunction) ;
 				
 				for (i=0;i<block_size && status!=1 ;i++) {
-					if(result[i]==MATCH)
+					if(result[i]==1)
 						status=1;
 				} 
 				if (CORE_verbose) {
@@ -360,17 +366,11 @@ void core(void){
 							printf("%c",word[k]);
 						printf("\t");
 						if (wordlength<=8)		
-							printf("\t");
-						switch(result[j]){
-							case MATCH: 
-								printf("YES\n");
-								break;
-							case NOMATCH:
-								printf("NO\n");
-								break;
-							default:
-								printf("ERROR\n");
-						}
+							printf("\t");						
+						if (result[j]==1)
+							printf("YES\n");
+						else
+							printf("NO\n");
 						printf("--- Performance: %g p/s, time: %.2g s, passwords: %d \n",block_size/(time/1000),time/1000,block_size);
 					}
 				}
@@ -455,7 +455,7 @@ void core(void){
 			for (;iblock<maxcombination && status==0;iblock+=1){
 				computePwd (iblock, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
 				word[wordlength]='\0';
-				value=cpu_Core_charset ( header, CORE_charset, word,  wordlength,CORE_keyDerivationFunction);  
+				value=cpu_Core_charset ( CORE_encryptionAlgorithm,header, CORE_charset, word,  wordlength,CORE_keyDerivationFunction);
 
 				if (value==1)
 					status=1;

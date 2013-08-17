@@ -24,9 +24,8 @@
 
 #include "Tcdefs.h"
 #include "Common/Endian.h"
-#include "Crypto.h"
+#include "Crypto.cuh"
 
-//#include "CudaAes.cuh"
 
 
 #ifdef __cplusplus
@@ -99,19 +98,15 @@ enum
   ERR_CRC_KEY_SET
 };
 
-enum{
-  NODEFINED,
-  MATCH,
-  NOMATCH,
-};
 
 
 
 
-int cuda_Xts(unsigned char *encryptedHeader, unsigned char *headerKey, unsigned char *test);
-int cuda_XtsTest(unsigned char *encryptedHeader, unsigned char *headerKey, unsigned char *test);
 
-void cuda_DecryptBufferXTS (unsigned __int8 *buffer,
+__device__ int cuXts(int encryptionAlgorithm, unsigned char *encryptedHeader, unsigned char *headerKey, unsigned char *test);
+//int cuXtsTest(unsigned char *encryptedHeader, unsigned char *headerKey, unsigned char *test);
+
+void cuDecryptBufferXTS (unsigned __int8 *buffer,
 					   TC_LARGEST_COMPILER_UINT length,
 					   unsigned int startCipherBlockNo,
 					   unsigned __int8 *ks,
