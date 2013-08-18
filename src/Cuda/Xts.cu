@@ -109,66 +109,294 @@ __device__ unsigned __int32 cuGetCrc32 (unsigned char *data, int length)
 	return CRC ^ 0xffffffff;
 }
 
-
-
-
-// Encrypts or decrypts all blocks in the buffer in XTS mode. For descriptions of the input parameters,
-// see the 64-bit version of EncryptBufferXTS().
-__device__ static void cuEncryptDecryptBufferXTS32 (const unsigned __int8 *buffer,
-        TC_LARGEST_COMPILER_UINT length,
-        const UINT64_STRUCT *startDataUnitNo,
-        unsigned int startBlock,
-        unsigned __int8 *ks,
-        unsigned __int8 *ks2,
-        int cipher,
-        BOOL decryption)
+// Optimized for encryption algorithms supporting intra-data-unit parallelization
+__device__ static void cuDecryptBufferXTSParallel (unsigned __int8 *buffer,
+									  TC_LARGEST_COMPILER_UINT length,
+									  const UINT64_STRUCT *startDataUnitNo,
+									  unsigned int startCipherBlockNo,
+									  unsigned __int8 *ks,
+									  unsigned __int8 *ks2,
+									  int cipher)
 {
-
-  __align__(8) unsigned __int8 byteBufUnitNo [BYTES_PER_XTS_BLOCK];
-  __align__(8) unsigned __int8 whiteningValue [BYTES_PER_XTS_BLOCK];
-  __align__(8) unsigned __int8 finalCarry;
-  unsigned __int32 *whiteningValuePtr32;
-  unsigned __int32 *finalDwordWhiteningValuePtr; 
-  unsigned __int32 *bufPtr32;  
-
-  TC_LARGEST_COMPILER_UINT blockCount;
-  UINT64_STRUCT dataUnitNo;
-  unsigned int block;
-  unsigned int endBlock;
-
-
-	bufPtr32 = (unsigned __int32 *) buffer;
-	whiteningValuePtr32 = (unsigned __int32 *) whiteningValue;
-	finalDwordWhiteningValuePtr = whiteningValuePtr32 + sizeof (whiteningValue) / sizeof (*whiteningValuePtr32) - 1;
-
-
-	// Store the 64-bit data unit number in a way compatible with non-64-bit environments/platforms
-	dataUnitNo.HighPart = startDataUnitNo->HighPart;
-	dataUnitNo.LowPart = startDataUnitNo->LowPart;
-
+	__align__(8) unsigned __int8 finalCarry;
+	__align__(8) unsigned __int8 whiteningValues [ENCRYPTION_DATA_UNIT_SIZE];
+	__align__(8) unsigned __int8 whiteningValue [BYTES_PER_XTS_BLOCK];
+	__align__(8) unsigned __int8 byteBufUnitNo [BYTES_PER_XTS_BLOCK];
+	__align__(8) unsigned __int64 *whiteningValuesPtr64 = (unsigned __int64 *) whiteningValues;
+	__align__(8) unsigned __int64 *whiteningValuePtr64 = (unsigned __int64 *) whiteningValue;
+	__align__(8) unsigned __int64 *bufPtr = (unsigned __int64 *) buffer;
+	__align__(8) unsigned __int64 *dataUnitBufPtr;
+	__align__(8) unsigned int startBlock = startCipherBlockNo, endBlock, block;
+	__align__(8) unsigned __int64 *const finalInt64WhiteningValuesPtr = whiteningValuesPtr64 + sizeof (whiteningValues) / sizeof (*whiteningValuesPtr64) - 1;
+	TC_LARGEST_COMPILER_UINT blockCount, dataUnitNo;
+	
+	// Convert the 64-bit data unit number into a little-endian 16-byte array.
+	// Note that as we are converting a 64-bit number into a 16-byte array we can always zero the last 8 bytes.
+	dataUnitNo = startDataUnitNo->Value;
+	*((unsigned __int64 *) byteBufUnitNo) = LE64 (dataUnitNo);
+	*((unsigned __int64 *) byteBufUnitNo + 1) = 0;
+	
+	if (length % BYTES_PER_XTS_BLOCK)
+		TC_THROW_FATAL_EXCEPTION;
+	
 	blockCount = length / BYTES_PER_XTS_BLOCK;
-
-	// Convert the 64-bit data unit number into a little-endian 16-byte array. 
-	// (Passed as two 32-bit integers for compatibility with non-64-bit environments/platforms.)
-	cuUint64ToLE16ByteArray (byteBufUnitNo, dataUnitNo.HighPart, dataUnitNo.LowPart);
-
-	// Generate whitening values for all blocks in the buffer
+	
+	// Process all blocks in the buffer
 	while (blockCount > 0)
 	{
-
-		
 		if (blockCount < BLOCKS_PER_XTS_DATA_UNIT)
 			endBlock = startBlock + (unsigned int) blockCount;
 		else
 			endBlock = BLOCKS_PER_XTS_DATA_UNIT;
 		
-
-		// Encrypt the data unit number using the secondary key (in order to generate the first 
+		whiteningValuesPtr64 = finalInt64WhiteningValuesPtr;
+		whiteningValuePtr64 = (unsigned __int64 *) whiteningValue;
+		
+		// Encrypt the data unit number using the secondary key (in order to generate the first
 		// whitening value for this data unit)
-		cuUint64ToLE16ByteArray (byteBufUnitNo, dataUnitNo.HighPart, dataUnitNo.LowPart);
+		*whiteningValuePtr64 = *((unsigned __int64 *) byteBufUnitNo);
+		*(whiteningValuePtr64 + 1) = 0;
+		cuEncipherBlock (cipher, whiteningValue, ks2);
+		
+		// Generate subsequent whitening values for blocks in this data unit. Note that all generated 128-bit
+		// whitening values are stored in memory as a sequence of 64-bit integers in reverse order.
+		for (block = 0; block < endBlock; block++)
+		{
+			if (block >= startBlock)
+			{
+				*whiteningValuesPtr64-- = *whiteningValuePtr64++;
+				*whiteningValuesPtr64-- = *whiteningValuePtr64;
+			}
+			else
+				whiteningValuePtr64++;
+			
+			// Derive the next whitening value
+			
+#if BYTE_ORDER == LITTLE_ENDIAN
+			
+			// Little-endian platforms
+			
+			finalCarry =
+			(*whiteningValuePtr64 & 0x8000000000000000) ?
+			135 : 0;
+			
+			*whiteningValuePtr64-- <<= 1;
+			
+			if (*whiteningValuePtr64 & 0x8000000000000000)
+				*(whiteningValuePtr64 + 1) |= 1;
+			
+			*whiteningValuePtr64 <<= 1;
+			
+#else
+			// Big-endian platforms
+			
+			finalCarry =
+			(*whiteningValuePtr64 & 0x80) ?
+			135 : 0;
+			
+			*whiteningValuePtr64 = LE64 (LE64 (*whiteningValuePtr64) << 1);
+			
+			whiteningValuePtr64--;
+			
+			if (*whiteningValuePtr64 & 0x80)
+				*(whiteningValuePtr64 + 1) |= 0x0100000000000000;
+			
+			*whiteningValuePtr64 = LE64 (LE64 (*whiteningValuePtr64) << 1);
+#endif
+			
+			whiteningValue[0] ^= finalCarry;
+		}
+		
+		dataUnitBufPtr = bufPtr;
+		whiteningValuesPtr64 = finalInt64WhiteningValuesPtr;
+		
+		// Decrypt blocks in this data unit
+		
+		for (block = startBlock; block < endBlock; block++)
+		{
+			*bufPtr++ ^= *whiteningValuesPtr64--;
+			*bufPtr++ ^= *whiteningValuesPtr64--;
+		}
+		
+		cuDecipherBlocks (cipher, dataUnitBufPtr, ks, endBlock - startBlock);
+		
+		bufPtr = dataUnitBufPtr;
+		whiteningValuesPtr64 = finalInt64WhiteningValuesPtr;
+		
+		for (block = startBlock; block < endBlock; block++)
+		{
+			*bufPtr++ ^= *whiteningValuesPtr64--;
+			*bufPtr++ ^= *whiteningValuesPtr64--;
+		}
+		
+		blockCount -= endBlock - startBlock;
+		startBlock = 0;
+		dataUnitNo++;
+		
+		*((unsigned __int64 *) byteBufUnitNo) = LE64 (dataUnitNo);
+	}
+	
+	FAST_ERASE64 (whiteningValue, sizeof (whiteningValue));
+	FAST_ERASE64 (whiteningValues, sizeof (whiteningValues));
+}
+
+
+/*
+// For descriptions of the input parameters, see EncryptBufferXTS().
+__device__ void DecryptBufferXTSNonParallel (unsigned __int8 *buffer,
+					   TC_LARGEST_COMPILER_UINT length,
+					   const UINT64_STRUCT *startDataUnitNo,
+					   unsigned int startCipherBlockNo,
+					   unsigned __int8 *ks,
+					   unsigned __int8 *ks2,
+					   int cipher)
+{
+	__align__(8) unsigned __int8 finalCarry;
+	__align__(8) unsigned __int8 whiteningValue [BYTES_PER_XTS_BLOCK];
+	__align__(8) unsigned __int8 byteBufUnitNo [BYTES_PER_XTS_BLOCK];
+	__align__(8) unsigned __int64 *whiteningValuePtr64 = (unsigned __int64 *) whiteningValue;
+	__align__(8) unsigned __int64 *bufPtr = (unsigned __int64 *) buffer;
+	__align__(8) unsigned int startBlock = startCipherBlockNo, endBlock, block;
+	__align__(8) TC_LARGEST_COMPILER_UINT blockCount, dataUnitNo;
+	
+	// Convert the 64-bit data unit number into a little-endian 16-byte array.
+	// Note that as we are converting a 64-bit number into a 16-byte array we can always zero the last 8 bytes.
+	dataUnitNo = startDataUnitNo->Value;
+	*((unsigned __int64 *) byteBufUnitNo) = LE64 (dataUnitNo);
+	*((unsigned __int64 *) byteBufUnitNo + 1) = 0;
+	
+	if (length % BYTES_PER_XTS_BLOCK)
+		TC_THROW_FATAL_EXCEPTION;
+	
+	blockCount = length / BYTES_PER_XTS_BLOCK;
+	
+	// Process all blocks in the buffer
+	while (blockCount > 0)
+	{
+		if (blockCount < BLOCKS_PER_XTS_DATA_UNIT)
+			endBlock = startBlock + (unsigned int) blockCount;
+		else
+			endBlock = BLOCKS_PER_XTS_DATA_UNIT;
+		
+		whiteningValuePtr64 = (unsigned __int64 *) whiteningValue;
+		
+		// Encrypt the data unit number using the secondary key (in order to generate the first
+		// whitening value for this data unit)
+		*whiteningValuePtr64 = *((unsigned __int64 *) byteBufUnitNo);
+		*(whiteningValuePtr64 + 1) = 0;
+		cuEncipherBlock (cipher, whiteningValue, ks2);
+		
+		// Generate (and apply) subsequent whitening values for blocks in this data unit and
+		// decrypt all relevant blocks in this data unit
+		for (block = 0; block < endBlock; block++)
+		{
+			if (block >= startBlock)
+			{
+				// Post-whitening
+				*bufPtr++ ^= *whiteningValuePtr64++;
+				*bufPtr-- ^= *whiteningValuePtr64--;
+				
+				// Actual decryption
+				cuDecipherBlock (cipher, bufPtr, ks);
+				
+				// Pre-whitening
+				*bufPtr++ ^= *whiteningValuePtr64++;
+				*bufPtr++ ^= *whiteningValuePtr64;
+			}
+			else
+				whiteningValuePtr64++;
+			
+			// Derive the next whitening value
+			
+#if BYTE_ORDER == LITTLE_ENDIAN
+			
+			// Little-endian platforms
+			
+			finalCarry =
+			(*whiteningValuePtr64 & 0x8000000000000000) ?
+			135 : 0;
+			
+			*whiteningValuePtr64-- <<= 1;
+			
+			if (*whiteningValuePtr64 & 0x8000000000000000)
+				*(whiteningValuePtr64 + 1) |= 1;
+			
+			*whiteningValuePtr64 <<= 1;
+			
+#else
+			// Big-endian platforms
+			
+			finalCarry =
+			(*whiteningValuePtr64 & 0x80) ?
+			135 : 0;
+			
+			*whiteningValuePtr64 = LE64 (LE64 (*whiteningValuePtr64) << 1);
+			
+			whiteningValuePtr64--;
+			
+			if (*whiteningValuePtr64 & 0x80)
+				*(whiteningValuePtr64 + 1) |= 0x0100000000000000;
+			
+			*whiteningValuePtr64 = LE64 (LE64 (*whiteningValuePtr64) << 1);
+#endif
+			
+			whiteningValue[0] ^= finalCarry;
+		}
+		
+		blockCount -= endBlock - startBlock;
+		startBlock = 0;
+		dataUnitNo++;
+		*((unsigned __int64 *) byteBufUnitNo) = LE64 (dataUnitNo);
+	}
+	
+	FAST_ERASE64 (whiteningValue, sizeof (whiteningValue));
+}*/
+
+// Encrypts or decrypts all blocks in the buffer in XTS mode. For descriptions of the input parameters,
+// see the 64-bit version of EncryptBufferXTS().
+__device__ static void cuEncryptDecryptBufferXTS32 (const unsigned __int8 *buffer,
+									   TC_LARGEST_COMPILER_UINT length,
+									   const UINT64_STRUCT *startDataUnitNo,
+									   unsigned int startBlock,
+									   unsigned __int8 *ks,
+									   unsigned __int8 *ks2,
+									   int cipher,
+									   BOOL decryption)
+{
+	TC_LARGEST_COMPILER_UINT blockCount;
+	UINT64_STRUCT dataUnitNo;
+	unsigned int block;
+	unsigned int endBlock;
+	__align__(8) unsigned __int8 byteBufUnitNo [BYTES_PER_XTS_BLOCK];
+	__align__(8) unsigned __int8 whiteningValue [BYTES_PER_XTS_BLOCK];
+	__align__(8) unsigned __int32 *bufPtr32 = (unsigned __int32 *) buffer;
+	__align__(8) unsigned __int32 *whiteningValuePtr32 = (unsigned __int32 *) whiteningValue;
+	__align__(8) unsigned __int8 finalCarry;
+	__align__(8) unsigned __int32 *const finalDwordWhiteningValuePtr = whiteningValuePtr32 + sizeof (whiteningValue) / sizeof (*whiteningValuePtr32) - 1;
+	
+	// Store the 64-bit data unit number in a way compatible with non-64-bit environments/platforms
+	dataUnitNo.HighPart = startDataUnitNo->HighPart;
+	dataUnitNo.LowPart = startDataUnitNo->LowPart;
+	
+	blockCount = length / BYTES_PER_XTS_BLOCK;
+	
+	// Convert the 64-bit data unit number into a little-endian 16-byte array.
+	// (Passed as two 32-bit integers for compatibility with non-64-bit environments/platforms.)
+	cuUint64ToLE16ByteArray (byteBufUnitNo, dataUnitNo.HighPart, dataUnitNo.LowPart);
+	
+	// Generate whitening values for all blocks in the buffer
+	while (blockCount > 0)
+	{
+		if (blockCount < BLOCKS_PER_XTS_DATA_UNIT)
+			endBlock = startBlock + (unsigned int) blockCount;
+		else
+			endBlock = BLOCKS_PER_XTS_DATA_UNIT;
+		
+		// Encrypt the data unit number using the secondary key (in order to generate the first
+		// whitening value for this data unit)
 		memcpy (whiteningValue, byteBufUnitNo, BYTES_PER_XTS_BLOCK);
 		cuEncipherBlock (cipher, whiteningValue, ks2);
-
+		
 		// Generate (and apply) subsequent whitening values for blocks in this data unit and
 		// encrypt/decrypt all relevant blocks in this data unit
 		for (block = 0; block < endBlock; block++)
@@ -176,37 +404,37 @@ __device__ static void cuEncryptDecryptBufferXTS32 (const unsigned __int8 *buffe
 			if (block >= startBlock)
 			{
 				whiteningValuePtr32 = (unsigned __int32 *) whiteningValue;
-
+				
 				// Whitening
 				*bufPtr32++ ^= *whiteningValuePtr32++;
 				*bufPtr32++ ^= *whiteningValuePtr32++;
 				*bufPtr32++ ^= *whiteningValuePtr32++;
 				*bufPtr32 ^= *whiteningValuePtr32;
-
+				
 				bufPtr32 -= BYTES_PER_XTS_BLOCK / sizeof (*bufPtr32) - 1;
-
+				
 				// Actual encryption/decryption
 				if (decryption)
 					cuDecipherBlock (cipher, bufPtr32, ks);
 				else
 					cuEncipherBlock (cipher, bufPtr32, ks);
-
+				
 				whiteningValuePtr32 = (unsigned __int32 *) whiteningValue;
-
+				
 				// Whitening
 				*bufPtr32++ ^= *whiteningValuePtr32++;
 				*bufPtr32++ ^= *whiteningValuePtr32++;
 				*bufPtr32++ ^= *whiteningValuePtr32++;
 				*bufPtr32++ ^= *whiteningValuePtr32;
 			}
-
+			
 			// Derive the next whitening value
-
+			
 			finalCarry = 0;
-
+			
 			for (whiteningValuePtr32 = finalDwordWhiteningValuePtr;
-				whiteningValuePtr32 >= (unsigned __int32 *) whiteningValue;
-				whiteningValuePtr32--)
+				 whiteningValuePtr32 >= (unsigned __int32 *) whiteningValue;
+				 whiteningValuePtr32--)
 			{
 				if (*whiteningValuePtr32 & 0x80000000)	// If the following shift results in a carry
 				{
@@ -215,35 +443,34 @@ __device__ static void cuEncryptDecryptBufferXTS32 (const unsigned __int8 *buffe
 						// A regular carry
 						*(whiteningValuePtr32 + 1) |= 1;
 					}
-					else 
+					else
 					{
 						// The highest byte shift will result in a carry
 						finalCarry = 135;
 					}
 				}
-
+				
 				*whiteningValuePtr32 <<= 1;
 			}
-
+			
 			whiteningValue[0] ^= finalCarry;
 		}
-
+		
 		blockCount -= endBlock - startBlock;
 		startBlock = 0;
-
+		
 		// Increase the data unit number by one
 		if (!++dataUnitNo.LowPart)
 		{
 			dataUnitNo.HighPart++;
 		}
-
-		// Convert the 64-bit data unit number into a little-endian 16-byte array. 
+		
+		// Convert the 64-bit data unit number into a little-endian 16-byte array.
 		cuUint64ToLE16ByteArray (byteBufUnitNo, dataUnitNo.HighPart, dataUnitNo.LowPart);
 	}
-
+	
 	FAST_ERASE64 (whiteningValue, sizeof (whiteningValue));
 }
-
 
 // For descriptions of the input parameters, see the 64-bit version of EncryptBufferXTS().
 __device__ void cuDecryptBufferXTS (unsigned __int8 *buffer,
@@ -255,7 +482,9 @@ __device__ void cuDecryptBufferXTS (unsigned __int8 *buffer,
 					   int cipher)
 {
 	// Decrypt all ciphertext blocks in the buffer
-	cuEncryptDecryptBufferXTS32 (buffer, length, startDataUnitNo, startCipherBlockNo, ks, ks2, cipher, TRUE);
+	//cuEncryptDecryptBufferXTS32 (buffer, length, startDataUnitNo, startCipherBlockNo, ks, ks2, cipher, TRUE);
+	//cuDecryptBufferXTSNonParallel (buffer, length, startDataUnitNo, startCipherBlockNo, ks, ks2, cipher);
+	cuDecryptBufferXTSParallel (buffer, length, startDataUnitNo, startCipherBlockNo, ks, ks2, cipher);
 }
 
 __device__ void cuDecryptBuffer (unsigned __int8 *buf, TC_LARGEST_COMPILER_UINT len, PCRYPTO_INFO cryptoInfo)

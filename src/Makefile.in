@@ -479,8 +479,6 @@ $(OBJ_CUDA):
 	cat Cuda/Core.cu > Cuda.cu 
 	cat Cuda/Pkcs5.cu >> Cuda.cu
 	cat Cuda/Aes.cu >> Cuda.cu
-	cat Cuda/Serpent.cu >> Cuda.cu
-	cat Cuda/Twofish.cu >> Cuda.cu
 	cat Cuda/Crypto.cu >> Cuda.cu
 	cat Cuda/Xts.cu >> Cuda.cu
 	cat Cuda/Rmd160.alternative.cu >> Cuda.cu
