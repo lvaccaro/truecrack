@@ -145,11 +145,11 @@ __device__ int cuCipherInit (int cipher, unsigned char *key, unsigned __int8 *ks
 			break;
 			
 		case SERPENT:
-			serpent_set_key (key, 32 * 8, ks);
+			//serpent_set_key (key, 32 * 8, ks);
 			break;
 			
 		case TWOFISH:
-			twofish_set_key ((TwofishInstance *)ks, (const u4byte *)key, 32 * 8);
+			//twofish_set_key ((TwofishInstance *)ks, (const u4byte *)key, 32 * 8);
 			break;
 		default:
 			// Unknown/wrong cipher ID
@@ -182,10 +182,10 @@ __device__ void cuEncipherBlock(int cipher, void *data, void *ks)
 			aes_encrypt ((const unsigned char*)data, (unsigned char*)data, (const aes_encrypt_ctx *)ks);
 			break;
 		case TWOFISH:
-			twofish_encrypt ((TwofishInstance *)ks, (const unsigned int *)data, (unsigned int *)data);
+			//twofish_encrypt ((TwofishInstance *)ks, (const unsigned int *)data, (unsigned int *)data);
 			break;
 		case SERPENT:
-			serpent_encrypt ((const unsigned char *)data, (unsigned char *)data, (unsigned char *)ks);
+			//serpent_encrypt ((const unsigned char *)data, (unsigned char *)data, (unsigned char *)ks);
 			break;
 		default:
 			;//TC_THROW_FATAL_EXCEPTION;	// Unknown/wrong ID
@@ -207,14 +207,26 @@ __device__ void cuDecipherBlock(int cipher, void *data, void *ks)
 			break;
 #endif
 		case SERPENT:
-			serpent_decrypt ((const unsigned char *)data, (unsigned char *)data, (unsigned char *)ks);
+			//serpent_decrypt ((const unsigned char *)data, (unsigned char *)data, (unsigned char *)ks);
 			break;
 		case TWOFISH:
-			twofish_decrypt ((TwofishInstance *)ks, (const unsigned int *)data, (unsigned int *)data);
+			//twofish_decrypt ((TwofishInstance *)ks, (const unsigned int *)data, (unsigned int *)data);
 			break;
 		default:
 			;//TC_THROW_FATAL_EXCEPTION;	// Unknown/wrong ID
     }
+}
+
+__device__ void cuDecipherBlocks (int cipher, void *dataPtr, void *ks, size_t blockCount)
+{
+		byte *data = (byte*)dataPtr;
+
+		size_t blockSize = 16;
+		while (blockCount-- > 0)
+		{
+			cuDecipherBlock (cipher, data, ks);
+			data += blockSize;
+		}
 }
 
 __device__ int cuEAInit (int ea, unsigned char *key, unsigned __int8 *ks)

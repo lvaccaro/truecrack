@@ -181,7 +181,7 @@ __global__ void cuKernel_aes (unsigned char *headerDecrypted, unsigned char *hea
 	//__align__(8) unsigned char headerDecrypted[512];
 	result[numData]=cuXts (AES,cHeaderEncrypted, headerKey+numData*MAXPKCS5OUTSIZE,headerDecrypted);
 }
-
+/*
 __global__ void cuKernel_serpent (unsigned char *headerDecrypted, unsigned char *headerKey, short int *result, int max) {
 	int value;
 	int numData=blockIdx.x*NUMTHREADSXBLOCK+threadIdx.x;
@@ -196,6 +196,7 @@ __global__ void cuKernel_twofish(unsigned char *headerKey, short int *result, in
 	__align__(8) unsigned char headerDecrypted[512];
 	result[numData]=cuXts (TWOFISH,cHeaderEncrypted, headerKey+numData*MAXPKCS5OUTSIZE,headerDecrypted);
 }
+*/
 /*
 void cuda_Core_dictionary ( int block_currentsize, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result, int keyDerivationFunction) {
 
@@ -323,7 +324,9 @@ float cuda_Core_dictionary ( int encryptionAlgorithm, int bsize, unsigned char *
 		printf("%02x",headerKey[i]);
 	printf(" -> ");
 		
-	unsigned char headerDecrypted[512]={0};
+	unsigned char headerDecrypted[512];
+	for (int k=0;k<512;k++)
+		headerDecrypted[k]=0;
 	unsigned char* dev_headerDecrypted;
 	HANDLE_ERROR(cudaMalloc((void **)&dev_headerDecrypted, 512*bsize*sizeof(unsigned char)));
 	HANDLE_ERROR(cudaMemcpy(dev_headerDecrypted, headerDecrypted, 512*bsize*sizeof(unsigned char), cudaMemcpyHostToDevice));
@@ -334,10 +337,10 @@ float cuda_Core_dictionary ( int encryptionAlgorithm, int bsize, unsigned char *
 			cuKernel_aes<<<numBlocks,numThreads>>>(dev_headerDecrypted,dev_headerKey, dev_result, bsize);
 			break;
 		case SERPENT:
-			cuKernel_serpent<<<numBlocks,numThreads>>>(dev_headerDecrypted,dev_headerKey, dev_result, bsize);
+			//cuKernel_serpent<<<numBlocks,numThreads>>>(dev_headerDecrypted,dev_headerKey, dev_result, bsize);
 			break;
 		case TWOFISH:
-			cuKernel_twofish<<<numBlocks,numThreads>>>(dev_headerKey, dev_result, bsize);
+			//cuKernel_twofish<<<numBlocks,numThreads>>>(dev_headerKey, dev_result, bsize);
 			break;
 	}
 
@@ -405,7 +408,7 @@ float cuda_Core_charset ( int encryptionAlgorithm, uint64_t bsize, uint64_t star
 			//cuKernel_serpent<<<numBlocks,numThreads>>>(dev_headerKey, dev_result, bsize);
 			break;
 		case TWOFISH:
-			cuKernel_twofish<<<numBlocks,numThreads>>>(dev_headerKey, dev_result, bsize);
+			//cuKernel_twofish<<<numBlocks,numThreads>>>(dev_headerKey, dev_result, bsize);
 			break;
 	}
 	

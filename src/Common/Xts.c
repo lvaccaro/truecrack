@@ -327,8 +327,7 @@ static void EncryptBufferXTSNonParallel (unsigned __int8 *buffer,
 		*((unsigned __int64 *) byteBufUnitNo) = LE64 (dataUnitNo);
 	}
 
-	FAST_ERASE64 (whiteningValue, sizeof (whiteningValue));
-}
+	FAST_ERASE64 (whiteningValue, sizeof (whiteningValue));}
 
 /*
 // For descriptions of the input parameters, see EncryptBufferXTS().
