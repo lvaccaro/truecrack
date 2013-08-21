@@ -169,7 +169,11 @@ typedef struct
 	BOOL Deprecated;
 	BOOL SystemEncryption;	// Available for system encryption
 } Hash;
-
+	
+#define max(x, y) (((x) > (y)) ? (x) : (y))
+	
+#define min(x, y) (((x) < (y)) ? (x) : (y))
+	
 // Maxium length of scheduled key
 #if !defined (TC_WINDOWS_BOOT) || defined (TC_WINDOWS_BOOT_AES)
 #	define AES_KS				(sizeof(aes_encrypt_ctx) + sizeof(aes_decrypt_ctx))
@@ -188,11 +192,15 @@ typedef struct
 #		define MAX_EXPANDED_KEY	TWOFISH_KS
 #	endif
 
-#else
-
-#define MAX_EXPANDED_KEY	(AES_KS + SERPENT_KS + TWOFISH_KS)
+#else	
+//************************
+//#define MAX_EXPANDED_KEY	(AES_KS + SERPENT_KS + TWOFISH_KS)
+#define MAX_EXPANDED_KEY	AES_KS+ SERPENT_KS
+//*************************
 
 #endif
+	
+	
 
 #ifdef DEBUG
 #	define PRAND_DISK_WIPE_PASSES	3
@@ -201,12 +209,11 @@ typedef struct
 #endif
 
 #if !defined (TC_WINDOWS_BOOT) || defined (TC_WINDOWS_BOOT_AES)
-#	include "Aes.cuh"
+#	include "Aes.h"
 #else
-#	include "AesSmall.cuh"
+#	include "AesSmall.h"
 #endif
-#include "Serpent.cuh"
-#include "Twofish.cuh"
+
 
 //#include "GfMul.h"
 #include "Password.h"
@@ -224,8 +231,8 @@ typedef struct CRYPTO_INFO_t
 {
 	int ea;									/* Encryption algorithm ID */
 	int mode;								/* Mode of operation (e.g., XTS) */
-	unsigned __int8 ks[MAX_EXPANDED_KEY];	/* Primary key schedule (if it is a cascade, it conatins multiple concatenated keys) */
-	unsigned __int8 ks2[MAX_EXPANDED_KEY];	/* Secondary key schedule (if cascade, multiple concatenated) for XTS mode. */
+	__align__(8) unsigned __int8 ks[MAX_EXPANDED_KEY];	/* Primary key schedule (if it is a cascade, it conatins multiple concatenated keys) */
+	__align__(8) unsigned __int8 ks2[MAX_EXPANDED_KEY];	/* Secondary key schedule (if cascade, multiple concatenated) for XTS mode. */
 
 	BOOL hiddenVolume;						// Indicates whether the volume is mounted/mountable as hidden volume
 
@@ -235,8 +242,7 @@ typedef struct CRYPTO_INFO_t
 	//GfCtx gf_ctx; 
 
 	//unsigned __int8 master_keydata[MASTER_KEYDATA_SIZE];	/* This holds the volume header area containing concatenated master key(s) and secondary key(s) (XTS mode). For LRW (deprecated/legacy), it contains the tweak key before the master key(s). For CBC (deprecated/legacy), it contains the IV seed before the master key(s). */
-	//unsigned __int8 k2[MASTER_KEYDATA_SIZE];				/* For XTS, this contains the secondary key (if cascade, multiple concatenated). For LRW (deprecated/legacy), it contains the tweak key. For CBC (deprecated/legacy), it contains the IV seed. */
-	unsigned __int8 km2[MASTER_KEYDATA_SIZE];				/* For XTS, this contains the secondary key (if cascade, multiple concatenated). For LRW (deprecated/legacy), it contains the tweak key. For CBC (deprecated/legacy), it contains the IV seed. */
+	__align__(8) unsigned __int8 k2[MASTER_KEYDATA_SIZE];				/* For XTS, this contains the secondary key (if cascade, multiple concatenated). For LRW (deprecated/legacy), it contains the tweak key. For CBC (deprecated/legacy), it contains the IV seed. */
 	
 	//unsigned __int8 salt[PKCS5_SALT_SIZE];
 	int noIterations;
@@ -274,37 +280,69 @@ typedef struct CRYPTO_INFO_t
 
 } CRYPTO_INFO, *PCRYPTO_INFO;
 
-__device__ PCRYPTO_INFO cuCrypto_open (void);
-__device__ void cuCrypto_loadkey (PKEY_INFO keyInfo, char *lpszUserKey, int nUserKeyLen);
-__device__ void cuCrypto_close (PCRYPTO_INFO cryptoInfo);
+PCRYPTO_INFO crypto_open (void);
+void crypto_loadkey (PKEY_INFO keyInfo, char *lpszUserKey, int nUserKeyLen);
+void crypto_close (PCRYPTO_INFO cryptoInfo);
 
+int CipherGetBlockSize (int cipher);
+int CipherGetKeySize (int cipher);
+int CipherGetKeyScheduleSize (int cipher);
+BOOL CipherSupportsIntraDataUnitParallelization (int cipher);
+char * CipherGetName (int cipher);
 
-__device__ int cuCipherInit (int cipher, unsigned char *key, unsigned char *ks);
-__device__ int cuEAInit (int ea, unsigned char *key, unsigned char *ks);
-__device__ BOOL cuEAInitMode (PCRYPTO_INFO ci);
-__device__ void cuEncipherBlock(int cipher, void *data, void *ks);
-__device__ void cuDecipherBlock(int cipher, void *data, void *ks);
+int CipherInit (int cipher, unsigned char *key, unsigned char *ks);
+int EAInit (int ea, unsigned char *key, unsigned char *ks);
+BOOL EAInitMode (PCRYPTO_INFO ci);
+void EncipherBlock(int cipher, void *data, void *ks);
+void DecipherBlock(int cipher, void *data, void *ks);
 #ifndef TC_WINDOWS_BOOT
-__device__ void cuEncipherBlocks (int cipher, void *dataPtr, void *ks, size_t blockCount);
-__device__ void cuDecipherBlocks (int cipher, void *dataPtr, void *ks, size_t blockCount);
+void EncipherBlocks (int cipher, void *dataPtr, void *ks, size_t blockCount);
+void DecipherBlocks (int cipher, void *dataPtr, void *ks, size_t blockCount);
 #endif
+
+int EAGetFirst ();
+int EAGetCount (void);
+int EAGetNext (int previousEA);
+char * EAGetName (char *buf, int ea);
+int EAGetByName (char *name);
+int EAGetKeySize (int ea);
+int EAGetFirstMode (int ea);
+int EAGetNextMode (int ea, int previousModeId);
+char * EAGetModeName (int ea, int mode, BOOL capitalLetters);
+int EAGetKeyScheduleSize (int ea);
+int EAGetLargestKey ();
+int EAGetLargestKeyForMode (int mode);
+
+int EAGetCipherCount (int ea);
+int EAGetFirstCipher (int ea);
+int EAGetLastCipher (int ea);
+int EAGetNextCipher (int ea, int previousCipherId);
+int EAGetPreviousCipher (int ea, int previousCipherId);
+int EAIsFormatEnabled (int ea);
+BOOL EAIsModeSupported (int ea, int testedMode);
+
+char *HashGetName (int hash_algo_id);
+BOOL HashIsDeprecated (int hashId);
 
 int GetMaxPkcs5OutSize (void);
 
-__device__ void EncryptDataUnits (unsigned __int8 *buf, const UINT64_STRUCT *structUnitNo, uint32 nbrUnits, PCRYPTO_INFO ci);
-__device__ void EncryptDataUnitsCurrentThread (unsigned __int8 *buf, const UINT64_STRUCT *structUnitNo, TC_LARGEST_COMPILER_UINT nbrUnits, PCRYPTO_INFO ci);
-__device__ void DecryptDataUnits (unsigned __int8 *buf, const UINT64_STRUCT *structUnitNo, uint32 nbrUnits, PCRYPTO_INFO ci);
-__device__ void DecryptDataUnitsCurrentThread (unsigned __int8 *buf, const UINT64_STRUCT *structUnitNo, TC_LARGEST_COMPILER_UINT nbrUnits, PCRYPTO_INFO ci);
-__device__ void cuEncryptBuffer (unsigned __int8 *buf, TC_LARGEST_COMPILER_UINT len, PCRYPTO_INFO cryptoInfo);
-__device__ void cuDecryptBuffer (unsigned __int8 *buf, TC_LARGEST_COMPILER_UINT len, PCRYPTO_INFO cryptoInfo);
+void EncryptDataUnits (unsigned __int8 *buf, const UINT64_STRUCT *structUnitNo, uint32 nbrUnits, PCRYPTO_INFO ci);
+void EncryptDataUnitsCurrentThread (unsigned __int8 *buf, const UINT64_STRUCT *structUnitNo, TC_LARGEST_COMPILER_UINT nbrUnits, PCRYPTO_INFO ci);
+void DecryptDataUnits (unsigned __int8 *buf, const UINT64_STRUCT *structUnitNo, uint32 nbrUnits, PCRYPTO_INFO ci);
+void DecryptDataUnitsCurrentThread (unsigned __int8 *buf, const UINT64_STRUCT *structUnitNo, TC_LARGEST_COMPILER_UINT nbrUnits, PCRYPTO_INFO ci);
+void EncryptBuffer (unsigned __int8 *buf, TC_LARGEST_COMPILER_UINT len, PCRYPTO_INFO cryptoInfo);
+void DecryptBuffer (unsigned __int8 *buf, TC_LARGEST_COMPILER_UINT len, PCRYPTO_INFO cryptoInfo);
 #ifndef TC_NO_COMPILER_INT64
-__device__ void cuEncryptBufferLRW128 (byte *buffer, uint64 length, uint64 blockIndex, PCRYPTO_INFO cryptoInfo);
-__device__ void cuDecryptBufferLRW128 (byte *buffer, uint64 length, uint64 blockIndex, PCRYPTO_INFO cryptoInfo);
-__device__ void cuEncryptBufferLRW64 (byte *buffer, uint64 length, uint64 blockIndex, PCRYPTO_INFO cryptoInfo);
-__device__ void cuDecryptBufferLRW64 (byte *buffer, uint64 length, uint64 blockIndex, PCRYPTO_INFO cryptoInfo);
-__device__ uint64 DataUnit2LRWIndex (uint64 dataUnit, int blockSize, PCRYPTO_INFO ci);
+void EncryptBufferLRW128 (byte *buffer, uint64 length, uint64 blockIndex, PCRYPTO_INFO cryptoInfo);
+void DecryptBufferLRW128 (byte *buffer, uint64 length, uint64 blockIndex, PCRYPTO_INFO cryptoInfo);
+void EncryptBufferLRW64 (byte *buffer, uint64 length, uint64 blockIndex, PCRYPTO_INFO cryptoInfo);
+void DecryptBufferLRW64 (byte *buffer, uint64 length, uint64 blockIndex, PCRYPTO_INFO cryptoInfo);
+uint64 DataUnit2LRWIndex (uint64 dataUnit, int blockSize, PCRYPTO_INFO ci);
 #endif	// #ifndef TC_NO_COMPILER_INT64
 
+BOOL IsAesHwCpuSupported ();
+void EnableHwEncryption (BOOL enable);
+BOOL IsHwEncryptionEnabled ();
 
 #ifdef __cplusplus
 }

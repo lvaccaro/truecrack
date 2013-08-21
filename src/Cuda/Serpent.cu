@@ -13,33 +13,38 @@
 
 #if defined(_WIN32) && !defined(_DEBUG)
 #include <stdlib.h>
-#define _rotlFixed _rotl
-#define _rotrFixed _rotr
+#define rotlFixed _rotl
+#define rotrFixed _rotr
 #else
-#define _rotlFixed(x,n)   (((x) << (n)) | ((x) >> (32 - (n))))
-#define _rotrFixed(x,n)   (((x) >> (n)) | ((x) << (32 - (n))))
+#define rotlFixed(x,n)   (((x) << (n)) | ((x) >> (32 - (n))))
+#define rotrFixed(x,n)   (((x) >> (n)) | ((x) << (32 - (n))))
 #endif
+
+
+
+#define TC_MINIMIZE_CODE_SIZE
+
 
 // linear transformation
 #define LT(i,a,b,c,d,e)	{\
-	a = _rotlFixed(a, 13);	\
-	c = _rotlFixed(c, 3); 	\
-	d = _rotlFixed(d ^ c ^ (a << 3), 7); 	\
-	b = _rotlFixed(b ^ a ^ c, 1); 	\
-	a = _rotlFixed(a ^ b ^ d, 5); 		\
-	c = _rotlFixed(c ^ d ^ (b << 7), 22);}
+	a = rotlFixed(a, 13);	\
+	c = rotlFixed(c, 3); 	\
+	d = rotlFixed(d ^ c ^ (a << 3), 7); 	\
+	b = rotlFixed(b ^ a ^ c, 1); 	\
+	a = rotlFixed(a ^ b ^ d, 5); 		\
+	c = rotlFixed(c ^ d ^ (b << 7), 22);}
 
 // inverse linear transformation
 #define ILT(i,a,b,c,d,e)	{\
-	c = _rotrFixed(c, 22);	\
-	a = _rotrFixed(a, 5); 	\
+	c = rotrFixed(c, 22);	\
+	a = rotrFixed(a, 5); 	\
 	c ^= d ^ (b << 7);	\
 	a ^= b ^ d; 		\
-	b = _rotrFixed(b, 1); 	\
-	d = _rotrFixed(d, 7) ^ c ^ (a << 3);	\
+	b = rotrFixed(b, 1); 	\
+	d = rotrFixed(d, 7) ^ c ^ (a << 3);	\
 	b ^= a ^ c; 		\
-	c = _rotrFixed(c, 3); 	\
-	a = _rotrFixed(a, 13);}
+	c = rotrFixed(c, 3); 	\
+	a = rotrFixed(a, 13);}
 
 // order of output from S-box functions
 #define beforeS0(f) f(0,a,b,c,d,e)
@@ -438,7 +443,7 @@
 
 #ifdef TC_MINIMIZE_CODE_SIZE
 
-__device__ static void S0f (unsigned __int32 *r0, unsigned __int32 *r1, unsigned __int32 *r2, unsigned __int32 *r3, unsigned __int32 *r4)
+__device__  void S0f (unsigned __int32 *r0, unsigned __int32 *r1, unsigned __int32 *r2, unsigned __int32 *r3, unsigned __int32 *r4)
 {
 	*r3 ^= *r0;
 	*r4 = *r1;
@@ -460,7 +465,7 @@ __device__ static void S0f (unsigned __int32 *r0, unsigned __int32 *r1, unsigned
 	*r4 ^= *r3;
 }
 
-__device__ static void S1f (unsigned __int32 *r0, unsigned __int32 *r1, unsigned __int32 *r2, unsigned __int32 *r3, unsigned __int32 *r4)
+__device__  void S1f (unsigned __int32 *r0, unsigned __int32 *r1, unsigned __int32 *r2, unsigned __int32 *r3, unsigned __int32 *r4)
 {        
     *r0 = ~*r0;   
     *r2 = ~*r2;   
@@ -482,7 +487,7 @@ __device__ static void S1f (unsigned __int32 *r0, unsigned __int32 *r1, unsigned
     *r0 ^= *r4;
 }
 
-__device__ static void S2f (unsigned __int32 *r0, unsigned __int32 *r1, unsigned __int32 *r2, unsigned __int32 *r3, unsigned __int32 *r4)
+__device__  void S2f (unsigned __int32 *r0, unsigned __int32 *r1, unsigned __int32 *r2, unsigned __int32 *r3, unsigned __int32 *r4)
 {        
 	*r4 = *r0;
 	*r0 &= *r2;
@@ -502,7 +507,7 @@ __device__ static void S2f (unsigned __int32 *r0, unsigned __int32 *r1, unsigned
 	*r4 = ~*r4;   
 }
 
-__device__ static void S3f (unsigned __int32 *r0, unsigned __int32 *r1, unsigned __int32 *r2, unsigned __int32 *r3, unsigned __int32 *r4)
+__device__  void S3f (unsigned __int32 *r0, unsigned __int32 *r1, unsigned __int32 *r2, unsigned __int32 *r3, unsigned __int32 *r4)
 {        
 	*r4 = *r0;
 	*r0 |= *r3;
@@ -525,7 +530,7 @@ __device__ static void S3f (unsigned __int32 *r0, unsigned __int32 *r1, unsigned
 	*r1 ^= *r0;
 }
 
-__device__ static void S4f (unsigned __int32 *r0, unsigned __int32 *r1, unsigned __int32 *r2, unsigned __int32 *r3, unsigned __int32 *r4)
+__device__  void S4f (unsigned __int32 *r0, unsigned __int32 *r1, unsigned __int32 *r2, unsigned __int32 *r3, unsigned __int32 *r4)
 {        
 	*r1 ^= *r3;
 	*r3 = ~*r3;   
@@ -549,7 +554,7 @@ __device__ static void S4f (unsigned __int32 *r0, unsigned __int32 *r1, unsigned
 	*r4 ^= *r2;
 }
 
-__device__ static void S5f (unsigned __int32 *r0, unsigned __int32 *r1, unsigned __int32 *r2, unsigned __int32 *r3, unsigned __int32 *r4)
+__device__  void S5f (unsigned __int32 *r0, unsigned __int32 *r1, unsigned __int32 *r2, unsigned __int32 *r3, unsigned __int32 *r4)
 {        
 	*r0 ^= *r1;
 	*r1 ^= *r3;
@@ -572,7 +577,7 @@ __device__ static void S5f (unsigned __int32 *r0, unsigned __int32 *r1, unsigned
 	*r2 ^= *r4;
 }
 
-__device__ static void S6f (unsigned __int32 *r0, unsigned __int32 *r1, unsigned __int32 *r2, unsigned __int32 *r3, unsigned __int32 *r4)
+__device__  void S6f (unsigned __int32 *r0, unsigned __int32 *r1, unsigned __int32 *r2, unsigned __int32 *r3, unsigned __int32 *r4)
 {        
 	*r2 = ~*r2;   
 	*r4 = *r3;
@@ -594,7 +599,7 @@ __device__ static void S6f (unsigned __int32 *r0, unsigned __int32 *r1, unsigned
 	*r2 ^= *r3;
 }
 
-__device__ static void S7f (unsigned __int32 *r0, unsigned __int32 *r1, unsigned __int32 *r2, unsigned __int32 *r3, unsigned __int32 *r4)
+__device__  void S7f (unsigned __int32 *r0, unsigned __int32 *r1, unsigned __int32 *r2, unsigned __int32 *r3, unsigned __int32 *r4)
 {        
 	*r4 = *r2;
 	*r2 &= *r1;
@@ -618,7 +623,7 @@ __device__ static void S7f (unsigned __int32 *r0, unsigned __int32 *r1, unsigned
 	*r4 ^= *r1;
 }
 
-__device__ static void KXf (const unsigned __int32 *k, unsigned int r, unsigned __int32 *a, unsigned __int32 *b, unsigned __int32 *c, unsigned __int32 *d)
+__device__  void KXf (const unsigned __int32 *k, unsigned int r, unsigned __int32 *a, unsigned __int32 *b, unsigned __int32 *c, unsigned __int32 *d)
 {
 	*a ^= k[r];
 	*b ^= k[r + 1];
@@ -646,7 +651,7 @@ __device__ void serpent_set_key(const unsigned __int8 userKey[], int keylen, uns
 	k += 8;
 	t = k[-1];
 	for (i = 0; i < 132; ++i)
-		k[i] = t = _rotlFixed(k[i-8] ^ k[i-5] ^ k[i-3] ^ t ^ 0x9e3779b9 ^ i, 11);
+		k[i] = t = rotlFixed(k[i-8] ^ k[i-5] ^ k[i-3] ^ t ^ 0x9e3779b9 ^ i, 11);
 	k -= 20;
 
 #define LK(r, a, b, c, d, e)	{\
@@ -678,7 +683,7 @@ __device__ void serpent_set_key(const unsigned __int8 userKey[], int keylen, uns
 
 #else // TC_MINIMIZE_CODE_SIZE
 
-__device__ static void LKf (unsigned __int32 *k, unsigned int r, unsigned __int32 *a, unsigned __int32 *b, unsigned __int32 *c, unsigned __int32 *d)
+__device__  void LKf (unsigned __int32 *k, unsigned int r, unsigned __int32 *a, unsigned __int32 *b, unsigned __int32 *c, unsigned __int32 *d)
 {
 	*a = k[r];
 	*b = k[r + 1];
@@ -686,7 +691,7 @@ __device__ static void LKf (unsigned __int32 *k, unsigned int r, unsigned __int3
 	*d = k[r + 3];
 }
 
-__device__ static void SKf (unsigned __int32 *k, unsigned int r, unsigned __int32 *a, unsigned __int32 *b, unsigned __int32 *c, unsigned __int32 *d)
+__device__  void SKf (unsigned __int32 *k, unsigned int r, unsigned __int32 *a, unsigned __int32 *b, unsigned __int32 *c, unsigned __int32 *d)
 {
 	k[r + 4] = *a;
 	k[r + 5] = *b;
@@ -698,7 +703,7 @@ __device__ void serpent_set_key(const unsigned __int8 userKey[], int keylen, uns
 {
 	unsigned __int32 a,b,c,d,e;
 	unsigned __int32 *k = (unsigned __int32 *)ks;
-	unsigned __int32 t;
+	unsigned __int32 t;	
 	int i;
 
 	for (i = 0; i < keylen / (int)sizeof(__int32); i++)
@@ -710,7 +715,7 @@ __device__ void serpent_set_key(const unsigned __int8 userKey[], int keylen, uns
 	k += 8;
 	t = k[-1];
 	for (i = 0; i < 132; ++i)
-		k[i] = t = _rotlFixed(k[i-8] ^ k[i-5] ^ k[i-3] ^ t ^ 0x9e3779b9 ^ i, 11);
+		k[i] = t = rotlFixed(k[i-8] ^ k[i-5] ^ k[i-3] ^ t ^ 0x9e3779b9 ^ i, 11);
 	k -= 20;
 
 	for (i=0; i<4; i++)
@@ -726,6 +731,7 @@ __device__ void serpent_set_key(const unsigned __int8 userKey[], int keylen, uns
 		LKf (k, 16, &e, &b, &d, &c); S4f (&e, &b, &d, &c, &a); SKf (k, 12, &b, &a, &e, &c);
 	}
 	LKf (k, 20, &a, &e, &b, &d); S3f (&a, &e, &b, &d, &c); SKf (k, 16, &e, &b, &d, &c);
+	
 }
 
 #endif // TC_MINIMIZE_CODE_SIZE
@@ -783,14 +789,14 @@ __device__ void serpent_encrypt(const unsigned __int8 *inBlock, unsigned __int8 
 
 typedef unsigned __int32 uint32;
 
-__device__ static void LTf (uint32 *a, uint32 *b, uint32 *c, uint32 *d)
+__device__  void LTf (uint32 *a, uint32 *b, uint32 *c, uint32 *d)
 {
-	*a = _rotlFixed(*a, 13);
-	*c = _rotlFixed(*c, 3);
-	*d = _rotlFixed(*d ^ *c ^ (*a << 3), 7);
-	*b = _rotlFixed(*b ^ *a ^ *c, 1);
-	*a = _rotlFixed(*a ^ *b ^ *d, 5);
-	*c = _rotlFixed(*c ^ *d ^ (*b << 7), 22);
+	*a = rotlFixed(*a, 13);
+	*c = rotlFixed(*c, 3);
+	*d = rotlFixed(*d ^ *c ^ (*a << 3), 7);
+	*b = rotlFixed(*b ^ *a ^ *c, 1);
+	*a = rotlFixed(*a ^ *b ^ *d, 5);
+	*c = rotlFixed(*c ^ *d ^ (*b << 7), 22);
 }
 
 __device__ void serpent_encrypt(const unsigned __int8 *inBlock, unsigned __int8 *outBlock, unsigned __int8 *ks)
@@ -886,7 +892,7 @@ start:
 
 #else // TC_MINIMIZE_CODE_SIZE && !TC_WINDOWS_BOOT_SERPENT
 
-__device__ static void ILTf (uint32 *a, uint32 *b, uint32 *c, uint32 *d)
+__device__  void ILTf (uint32 *a, uint32 *b, uint32 *c, uint32 *d)
 { 
 	*c = rotrFixed(*c, 22);
 	*a = rotrFixed(*a, 5);

@@ -17,30 +17,28 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  */
- #include "Xts.cuh"
 #if BYTE_ORDER == BIG_ENDIAN
 #error The TC_NO_COMPILER_INT64 version of the XTS code is not compatible with big-endian platforms
 #endif
 #include "Endian.h"
-#include "Volumes.cuh"
 
 #if BYTE_ORDER == LITTLE_ENDIAN
-#	define CUDA_BE16(x) cuMirrorBytes16(x)
-#	define CUDA_BE32(x) cuMirrorBytes32(x)
-#	define CUDA_BE64(x) cuMirrorBytes64(x)
+#	define CUDA_BE16(x) cuda_MirrorBytes16(x)
+#	define CUDA_BE32(x) cuda_MirrorBytes32(x)
+#	define CUDA_BE64(x) cuda_MirrorBytes64(x)
 #else
 #	define CUDA_BE16(x) (x)
 #	define CUDA_BE32(x) (x)
 #	define CUDA_BE64(x) (x)
 #endif
 
-__device__ unsigned __int16 cuMirrorBytes16 (unsigned __int16 x)
+__device__ unsigned __int16 cuda_MirrorBytes16 (unsigned __int16 x)
 {
 	return (x << 8) | (x >> 8);
 }
 
 
-__device__ unsigned __int32 cuMirrorBytes32 (unsigned __int32 x)
+__device__ unsigned __int32 cuda_MirrorBytes32 (unsigned __int32 x)
 {
 	unsigned __int32 n = (unsigned __int8) x;
 	n <<= 8; n |= (unsigned __int8) (x >> 8);
@@ -48,21 +46,12 @@ __device__ unsigned __int32 cuMirrorBytes32 (unsigned __int32 x)
 	return (n << 8) | (unsigned __int8) (x >> 24);
 }
 
-__device__ uint16 cuGetHeaderField16 (byte *header, int offset)
-{
-	return CUDA_BE16 (*(uint16 *) (header + offset));
-}
-
-
-__device__ uint32 cuGetHeaderField32 (byte *header, int offset)
-{
-	return CUDA_BE32 (*(uint32 *) (header + offset));
-}
-
+#define GetHeaderField16(header,offset) (CUDA_BE16(*(uint16*)(header+offset)))
+#define GetHeaderField32(header,offset) (CUDA_BE32(*(uint32*)(header+offset)))
 
 /* CRC polynomial 0x04c11db7 */
 __constant__ unsigned __int32 cuda_crc_32_tab[]=
-{				
+{
 	0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f, 0xe963a535, 0x9e6495a3,
 	0x0edb8832, 0x79dcb8a4, 0xe0d5e91e, 0x97d2d988, 0x09b64c2b, 0x7eb17cbd, 0xe7b82d07, 0x90bf1d91,
 	0x1db71064, 0x6ab020f2, 0xf3b97148, 0x84be41de, 0x1adad47d, 0x6ddde4eb, 0xf4d4b551, 0x83d385c7,
@@ -100,279 +89,53 @@ __constant__ unsigned __int32 cuda_crc_32_tab[]=
 __device__ unsigned __int32 cuGetCrc32 (unsigned char *data, int length)
 {
 	unsigned __int32 CRC = 0xffffffff;
-
+	
 	while (length--)
 	{
 		CRC = (CRC >> 8) ^ cuda_crc_32_tab[ (CRC ^ *data++) & 0xFF ];
 	}
-
+	
 	return CRC ^ 0xffffffff;
 }
 
-// Optimized for encryption algorithms supporting intra-data-unit parallelization
-__device__ static void cuDecryptBufferXTSParallel (unsigned __int8 *buffer,
-									  TC_LARGEST_COMPILER_UINT length,
-									  const UINT64_STRUCT *startDataUnitNo,
-									  unsigned int startCipherBlockNo,
-									  unsigned __int8 *ks,
-									  unsigned __int8 *ks2,
-									  int cipher)
-{
-	__align__(8) unsigned __int8 finalCarry;
-	__align__(8) unsigned __int8 whiteningValues [ENCRYPTION_DATA_UNIT_SIZE];
-	__align__(8) unsigned __int8 whiteningValue [BYTES_PER_XTS_BLOCK];
-	__align__(8) unsigned __int8 byteBufUnitNo [BYTES_PER_XTS_BLOCK];
-	__align__(8) unsigned __int64 *whiteningValuesPtr64 = (unsigned __int64 *) whiteningValues;
-	__align__(8) unsigned __int64 *whiteningValuePtr64 = (unsigned __int64 *) whiteningValue;
-	__align__(8) unsigned __int64 *bufPtr = (unsigned __int64 *) buffer;
-	__align__(8) unsigned __int64 *dataUnitBufPtr;
-	__align__(8) unsigned int startBlock = startCipherBlockNo, endBlock, block;
-	__align__(8) unsigned __int64 *const finalInt64WhiteningValuesPtr = whiteningValuesPtr64 + sizeof (whiteningValues) / sizeof (*whiteningValuesPtr64) - 1;
-	TC_LARGEST_COMPILER_UINT blockCount, dataUnitNo;
-	
-	// Convert the 64-bit data unit number into a little-endian 16-byte array.
-	// Note that as we are converting a 64-bit number into a 16-byte array we can always zero the last 8 bytes.
-	dataUnitNo = startDataUnitNo->Value;
-	*((unsigned __int64 *) byteBufUnitNo) = LE64 (dataUnitNo);
-	*((unsigned __int64 *) byteBufUnitNo + 1) = 0;
-	
-	if (length % BYTES_PER_XTS_BLOCK)
-		TC_THROW_FATAL_EXCEPTION;
-	
-	blockCount = length / BYTES_PER_XTS_BLOCK;
-	
-	// Process all blocks in the buffer
-	while (blockCount > 0)
-	{
-		if (blockCount < BLOCKS_PER_XTS_DATA_UNIT)
-			endBlock = startBlock + (unsigned int) blockCount;
-		else
-			endBlock = BLOCKS_PER_XTS_DATA_UNIT;
-		
-		whiteningValuesPtr64 = finalInt64WhiteningValuesPtr;
-		whiteningValuePtr64 = (unsigned __int64 *) whiteningValue;
-		
-		// Encrypt the data unit number using the secondary key (in order to generate the first
-		// whitening value for this data unit)
-		*whiteningValuePtr64 = *((unsigned __int64 *) byteBufUnitNo);
-		*(whiteningValuePtr64 + 1) = 0;
-		cuEncipherBlock (cipher, whiteningValue, ks2);
-		
-		// Generate subsequent whitening values for blocks in this data unit. Note that all generated 128-bit
-		// whitening values are stored in memory as a sequence of 64-bit integers in reverse order.
-		for (block = 0; block < endBlock; block++)
-		{
-			if (block >= startBlock)
-			{
-				*whiteningValuesPtr64-- = *whiteningValuePtr64++;
-				*whiteningValuesPtr64-- = *whiteningValuePtr64;
-			}
-			else
-				whiteningValuePtr64++;
-			
-			// Derive the next whitening value
-			
-#if BYTE_ORDER == LITTLE_ENDIAN
-			
-			// Little-endian platforms
-			
-			finalCarry =
-			(*whiteningValuePtr64 & 0x8000000000000000) ?
-			135 : 0;
-			
-			*whiteningValuePtr64-- <<= 1;
-			
-			if (*whiteningValuePtr64 & 0x8000000000000000)
-				*(whiteningValuePtr64 + 1) |= 1;
-			
-			*whiteningValuePtr64 <<= 1;
-			
-#else
-			// Big-endian platforms
-			
-			finalCarry =
-			(*whiteningValuePtr64 & 0x80) ?
-			135 : 0;
-			
-			*whiteningValuePtr64 = LE64 (LE64 (*whiteningValuePtr64) << 1);
-			
-			whiteningValuePtr64--;
-			
-			if (*whiteningValuePtr64 & 0x80)
-				*(whiteningValuePtr64 + 1) |= 0x0100000000000000;
-			
-			*whiteningValuePtr64 = LE64 (LE64 (*whiteningValuePtr64) << 1);
-#endif
-			
-			whiteningValue[0] ^= finalCarry;
-		}
-		
-		dataUnitBufPtr = bufPtr;
-		whiteningValuesPtr64 = finalInt64WhiteningValuesPtr;
-		
-		// Decrypt blocks in this data unit
-		
-		for (block = startBlock; block < endBlock; block++)
-		{
-			*bufPtr++ ^= *whiteningValuesPtr64--;
-			*bufPtr++ ^= *whiteningValuesPtr64--;
-		}
-		
-		cuDecipherBlocks (cipher, dataUnitBufPtr, ks, endBlock - startBlock);
-		
-		bufPtr = dataUnitBufPtr;
-		whiteningValuesPtr64 = finalInt64WhiteningValuesPtr;
-		
-		for (block = startBlock; block < endBlock; block++)
-		{
-			*bufPtr++ ^= *whiteningValuesPtr64--;
-			*bufPtr++ ^= *whiteningValuesPtr64--;
-		}
-		
-		blockCount -= endBlock - startBlock;
-		startBlock = 0;
-		dataUnitNo++;
-		
-		*((unsigned __int64 *) byteBufUnitNo) = LE64 (dataUnitNo);
-	}
-	
-	FAST_ERASE64 (whiteningValue, sizeof (whiteningValue));
-	FAST_ERASE64 (whiteningValues, sizeof (whiteningValues));
+__device__ void cuda_memcpy (unsigned char* to , unsigned char* from, int length){
+	int i;
+	for (i=0;i<length;i++)
+		to[i]=from[i];
 }
 
 
-/*
-// For descriptions of the input parameters, see EncryptBufferXTS().
-__device__ void DecryptBufferXTSNonParallel (unsigned __int8 *buffer,
-					   TC_LARGEST_COMPILER_UINT length,
-					   const UINT64_STRUCT *startDataUnitNo,
-					   unsigned int startCipherBlockNo,
-					   unsigned __int8 *ks,
-					   unsigned __int8 *ks2,
-					   int cipher)
-{
-	__align__(8) unsigned __int8 finalCarry;
-	__align__(8) unsigned __int8 whiteningValue [BYTES_PER_XTS_BLOCK];
-	__align__(8) unsigned __int8 byteBufUnitNo [BYTES_PER_XTS_BLOCK];
-	__align__(8) unsigned __int64 *whiteningValuePtr64 = (unsigned __int64 *) whiteningValue;
-	__align__(8) unsigned __int64 *bufPtr = (unsigned __int64 *) buffer;
-	__align__(8) unsigned int startBlock = startCipherBlockNo, endBlock, block;
-	__align__(8) TC_LARGEST_COMPILER_UINT blockCount, dataUnitNo;
-	
-	// Convert the 64-bit data unit number into a little-endian 16-byte array.
-	// Note that as we are converting a 64-bit number into a 16-byte array we can always zero the last 8 bytes.
-	dataUnitNo = startDataUnitNo->Value;
-	*((unsigned __int64 *) byteBufUnitNo) = LE64 (dataUnitNo);
-	*((unsigned __int64 *) byteBufUnitNo + 1) = 0;
-	
-	if (length % BYTES_PER_XTS_BLOCK)
-		TC_THROW_FATAL_EXCEPTION;
-	
-	blockCount = length / BYTES_PER_XTS_BLOCK;
-	
-	// Process all blocks in the buffer
-	while (blockCount > 0)
-	{
-		if (blockCount < BLOCKS_PER_XTS_DATA_UNIT)
-			endBlock = startBlock + (unsigned int) blockCount;
-		else
-			endBlock = BLOCKS_PER_XTS_DATA_UNIT;
-		
-		whiteningValuePtr64 = (unsigned __int64 *) whiteningValue;
-		
-		// Encrypt the data unit number using the secondary key (in order to generate the first
-		// whitening value for this data unit)
-		*whiteningValuePtr64 = *((unsigned __int64 *) byteBufUnitNo);
-		*(whiteningValuePtr64 + 1) = 0;
-		cuEncipherBlock (cipher, whiteningValue, ks2);
-		
-		// Generate (and apply) subsequent whitening values for blocks in this data unit and
-		// decrypt all relevant blocks in this data unit
-		for (block = 0; block < endBlock; block++)
-		{
-			if (block >= startBlock)
-			{
-				// Post-whitening
-				*bufPtr++ ^= *whiteningValuePtr64++;
-				*bufPtr-- ^= *whiteningValuePtr64--;
-				
-				// Actual decryption
-				cuDecipherBlock (cipher, bufPtr, ks);
-				
-				// Pre-whitening
-				*bufPtr++ ^= *whiteningValuePtr64++;
-				*bufPtr++ ^= *whiteningValuePtr64;
-			}
-			else
-				whiteningValuePtr64++;
-			
-			// Derive the next whitening value
-			
-#if BYTE_ORDER == LITTLE_ENDIAN
-			
-			// Little-endian platforms
-			
-			finalCarry =
-			(*whiteningValuePtr64 & 0x8000000000000000) ?
-			135 : 0;
-			
-			*whiteningValuePtr64-- <<= 1;
-			
-			if (*whiteningValuePtr64 & 0x8000000000000000)
-				*(whiteningValuePtr64 + 1) |= 1;
-			
-			*whiteningValuePtr64 <<= 1;
-			
-#else
-			// Big-endian platforms
-			
-			finalCarry =
-			(*whiteningValuePtr64 & 0x80) ?
-			135 : 0;
-			
-			*whiteningValuePtr64 = LE64 (LE64 (*whiteningValuePtr64) << 1);
-			
-			whiteningValuePtr64--;
-			
-			if (*whiteningValuePtr64 & 0x80)
-				*(whiteningValuePtr64 + 1) |= 0x0100000000000000;
-			
-			*whiteningValuePtr64 = LE64 (LE64 (*whiteningValuePtr64) << 1);
-#endif
-			
-			whiteningValue[0] ^= finalCarry;
-		}
-		
-		blockCount -= endBlock - startBlock;
-		startBlock = 0;
-		dataUnitNo++;
-		*((unsigned __int64 *) byteBufUnitNo) = LE64 (dataUnitNo);
-	}
-	
-	FAST_ERASE64 (whiteningValue, sizeof (whiteningValue));
-}*/
+
 
 // Encrypts or decrypts all blocks in the buffer in XTS mode. For descriptions of the input parameters,
 // see the 64-bit version of EncryptBufferXTS().
 __device__ static void cuEncryptDecryptBufferXTS32 (const unsigned __int8 *buffer,
-									   TC_LARGEST_COMPILER_UINT length,
-									   const UINT64_STRUCT *startDataUnitNo,
-									   unsigned int startBlock,
-									   unsigned __int8 *ks,
-									   unsigned __int8 *ks2,
-									   int cipher,
-									   BOOL decryption)
+													   TC_LARGEST_COMPILER_UINT length,
+													   const UINT64_STRUCT *startDataUnitNo,
+													   unsigned int startBlock,
+													   unsigned __int8 *ks,
+													   unsigned __int8 *ks2,
+													   int cipher,
+													   BOOL decryption)
 {
+	
+	__align__(8) unsigned __int8 byteBufUnitNo [BYTES_PER_XTS_BLOCK];
+	__align__(8) unsigned __int8 whiteningValue [BYTES_PER_XTS_BLOCK];
+	__align__(8) unsigned __int8 finalCarry;
+	unsigned __int32 *whiteningValuePtr32;
+	unsigned __int32 *finalDwordWhiteningValuePtr;
+	unsigned __int32 *bufPtr32;
+	
 	TC_LARGEST_COMPILER_UINT blockCount;
 	UINT64_STRUCT dataUnitNo;
 	unsigned int block;
 	unsigned int endBlock;
-	__align__(8) unsigned __int8 byteBufUnitNo [BYTES_PER_XTS_BLOCK];
-	__align__(8) unsigned __int8 whiteningValue [BYTES_PER_XTS_BLOCK];
-	__align__(8) unsigned __int32 *bufPtr32 = (unsigned __int32 *) buffer;
-	__align__(8) unsigned __int32 *whiteningValuePtr32 = (unsigned __int32 *) whiteningValue;
-	__align__(8) unsigned __int8 finalCarry;
-	__align__(8) unsigned __int32 *const finalDwordWhiteningValuePtr = whiteningValuePtr32 + sizeof (whiteningValue) / sizeof (*whiteningValuePtr32) - 1;
+	
+	
+	bufPtr32 = (unsigned __int32 *) buffer;
+	whiteningValuePtr32 = (unsigned __int32 *) whiteningValue;
+	finalDwordWhiteningValuePtr = whiteningValuePtr32 + sizeof (whiteningValue) / sizeof (*whiteningValuePtr32) - 1;
+	
 	
 	// Store the 64-bit data unit number in a way compatible with non-64-bit environments/platforms
 	dataUnitNo.HighPart = startDataUnitNo->HighPart;
@@ -387,14 +150,18 @@ __device__ static void cuEncryptDecryptBufferXTS32 (const unsigned __int8 *buffe
 	// Generate whitening values for all blocks in the buffer
 	while (blockCount > 0)
 	{
+		
+		
 		if (blockCount < BLOCKS_PER_XTS_DATA_UNIT)
 			endBlock = startBlock + (unsigned int) blockCount;
 		else
 			endBlock = BLOCKS_PER_XTS_DATA_UNIT;
 		
+		
 		// Encrypt the data unit number using the secondary key (in order to generate the first
 		// whitening value for this data unit)
-		memcpy (whiteningValue, byteBufUnitNo, BYTES_PER_XTS_BLOCK);
+		cuUint64ToLE16ByteArray (byteBufUnitNo, dataUnitNo.HighPart, dataUnitNo.LowPart);
+		cuda_memcpy (whiteningValue, byteBufUnitNo, BYTES_PER_XTS_BLOCK);
 		cuEncipherBlock (cipher, whiteningValue, ks2);
 		
 		// Generate (and apply) subsequent whitening values for blocks in this data unit and
@@ -472,19 +239,18 @@ __device__ static void cuEncryptDecryptBufferXTS32 (const unsigned __int8 *buffe
 	FAST_ERASE64 (whiteningValue, sizeof (whiteningValue));
 }
 
+
 // For descriptions of the input parameters, see the 64-bit version of EncryptBufferXTS().
 __device__ void cuDecryptBufferXTS (unsigned __int8 *buffer,
-					   TC_LARGEST_COMPILER_UINT length,
-					   const UINT64_STRUCT *startDataUnitNo,
-					   unsigned int startCipherBlockNo,
-					   unsigned __int8 *ks,
-					   unsigned __int8 *ks2,
-					   int cipher)
+									   TC_LARGEST_COMPILER_UINT length,
+									   const UINT64_STRUCT *startDataUnitNo,
+									   unsigned int startCipherBlockNo,
+									   unsigned __int8 *ks,
+									   unsigned __int8 *ks2,
+									   int cipher)
 {
 	// Decrypt all ciphertext blocks in the buffer
-	//cuEncryptDecryptBufferXTS32 (buffer, length, startDataUnitNo, startCipherBlockNo, ks, ks2, cipher, TRUE);
-	//cuDecryptBufferXTSNonParallel (buffer, length, startDataUnitNo, startCipherBlockNo, ks, ks2, cipher);
-	cuDecryptBufferXTSParallel (buffer, length, startDataUnitNo, startCipherBlockNo, ks, ks2, cipher);
+	cuEncryptDecryptBufferXTS32 (buffer, length, startDataUnitNo, startCipherBlockNo, ks, ks2, cipher, TRUE);
 }
 
 __device__ void cuDecryptBuffer (unsigned __int8 *buf, TC_LARGEST_COMPILER_UINT len, PCRYPTO_INFO cryptoInfo)
@@ -493,91 +259,91 @@ __device__ void cuDecryptBuffer (unsigned __int8 *buf, TC_LARGEST_COMPILER_UINT 
 	//unsigned __int8 *ks2 = cryptoInfo->ks2;// + EAGetKeyScheduleSize (cryptoInfo->ea);
 	UINT64_STRUCT dataUnitNo;
 	//int cipher;
-
+	
 	// When encrypting/decrypting a buffer (typically a volume header) the sequential number
 	// of the first XTS data unit in the buffer is always 0 and the start of the buffer is
 	// always assumed to be aligned with the start of the data unit 0.
 	dataUnitNo.LowPart = 0;
 	dataUnitNo.HighPart = 0;
-
-//	for (cipher = EAGetLastCipher (cryptoInfo->ea);
-//		cipher != 0;
-//		cipher = EAGetPreviousCipher (cryptoInfo->ea, cipher))
-//	{
-//		ks -= CipherGetKeyScheduleSize (cipher);
-//		ks2 -= CipherGetKeyScheduleSize (cipher);
-		cuDecryptBufferXTS (buf, len, &dataUnitNo, 0, cryptoInfo->ks, cryptoInfo->ks2, cryptoInfo->ea);
-//	}
+	
+	//	for (cipher = EAGetLastCipher (cryptoInfo->ea);
+	//		cipher != 0;
+	//		cipher = EAGetPreviousCipher (cryptoInfo->ea, cipher))
+	//	{
+	//		ks -= CipherGetKeyScheduleSize (cipher);
+	//		ks2 -= CipherGetKeyScheduleSize (cipher);
+	cuDecryptBufferXTS (buf, len, &dataUnitNo, 0, cryptoInfo->ks, cryptoInfo->ks2, cryptoInfo->ea);
+	//	}
 }
 
 
-__device__ int cuXts(int encryptionAlgorithm, unsigned char *encryptedHeader, unsigned char *headerKey, unsigned char *header) {
 
+__device__ int cuXts(int encryptionAlgorithm, unsigned char *encryptedHeader, unsigned char *headerKey, unsigned char *header) {
+	
     PCRYPTO_INFO cryptoInfo;
     CRYPTO_INFO cryptoInfo_struct;
-
+	
     uint16 headerVersion;
     int status = ERR_PARAMETER_INCORRECT;
     int primaryKeyOffset=0;
-
+	int eaGetKeySize=32; 
+	
     //int pkcs5PrfCount = LAST_PRF_ID - FIRST_PRF_ID + 1;
-
-    cryptoInfo=&cryptoInfo_struct;
-    memset (cryptoInfo, 0, sizeof (CRYPTO_INFO));
+	
+    cryptoInfo=&cryptoInfo_struct;    
     if (cryptoInfo == NULL)
         return ERR_OUT_OF_MEMORY;
+    memset (cryptoInfo, 0, sizeof (CRYPTO_INFO));
 
-
-	
-    // Support only XTS
-    cryptoInfo->mode= XTS ;
-	if(encryptionAlgorithm!=AES && encryptionAlgorithm!=SERPENT && encryptionAlgorithm!=TWOFISH)
-		return ERR_CIPHER_INIT;
-	cryptoInfo->ea=encryptionAlgorithm;
-
-    status = cuEAInit (cryptoInfo->ea, headerKey + primaryKeyOffset, cryptoInfo->ks);
-    if (status == ERR_CIPHER_INIT_FAILURE)
-        return ERR_CIPHER_INIT;
     // Init objects related to the mode of operation
-
-    // Copy the secondary key (if cascade, multiple concatenated)
-    //memcpy (cryptoInfo->km2, headerKey + EAGetKeySize (cryptoInfo->ea), EAGetKeySize (cryptoInfo->ea));
-    memcpy (cryptoInfo->km2, headerKey + 32, 32);
+	// Support only XTS
+    cryptoInfo->mode= XTS ;
+	if (encryptionAlgorithm!=AES && encryptionAlgorithm!=SERPENT && encryptionAlgorithm!=TWOFISH)
+		return UNDEFINED;
+    cryptoInfo->ea=encryptionAlgorithm;
+	
+	// Primary key schedule
+	cuda_memcpy (cryptoInfo->k2, headerKey + primaryKeyOffset, 64);
+	status = cuCipherInit (cryptoInfo->ea, cryptoInfo->k2, cryptoInfo->ks);
+    if (status != ERR_SUCCESS)
+        return ERR_CIPHER_INIT;
+        
     // Secondary key schedule
-    if (!cuEAInitMode (cryptoInfo)) {
+    cuda_memcpy (cryptoInfo->k2, headerKey + eaGetKeySize, eaGetKeySize);
+	status = cuCipherInit (cryptoInfo->ea, cryptoInfo->k2, cryptoInfo->ks2);
+    if (status != ERR_SUCCESS)
         return ERR_MODE_INIT;
-    }
+    
  
     // Copy the header for decryption
-    memcpy (header, encryptedHeader, 512*sizeof(unsigned char));
-
+    cuda_memcpy (header, encryptedHeader, 512*sizeof(unsigned char));
+	
     // Try to decrypt header
     cuDecryptBuffer (header + HEADER_ENCRYPTED_DATA_OFFSET, HEADER_ENCRYPTED_DATA_SIZE, cryptoInfo);
-   
-    
-            // Magic 'TRUE'
-            if (cuGetHeaderField32 (header, TC_HEADER_OFFSET_MAGIC) != 0x54525545)
-                return ERR_MAGIC_TRUE;
+	    
+	// Magic 'TRUE'
+	if (GetHeaderField32 (header, TC_HEADER_OFFSET_MAGIC) != 0x54525545)
+		return ERR_MAGIC_TRUE;
+	
+	// Header version
+	headerVersion = GetHeaderField16 (header, TC_HEADER_OFFSET_VERSION);
+	if (headerVersion > VOLUME_HEADER_VERSION) {
+		return ERR_VERSION_REQUIRED;
+	}
+	
+	// Check CRC of the header fields
+	if (headerVersion >= 4
+		&& GetHeaderField32 (header, TC_HEADER_OFFSET_HEADER_CRC) != cuGetCrc32 (header + TC_HEADER_OFFSET_MAGIC, TC_HEADER_OFFSET_HEADER_CRC - TC_HEADER_OFFSET_MAGIC))
+		//printf("Unsuccessful\n");
+		return ERR_CRC_HEADER_FIELDS;
+	// Required program version
+	//cryptoInfo->RequiredProgramVersion = GetHeaderField16 (header, TC_HEADER_OFFSET_REQUIRED_VERSION);
+	//cryptoInfo->LegacyVolume = cryptoInfo->RequiredProgramVersion < 0x600;
+	
+	// Check CRC of the key set
+	if (GetHeaderField32 (header, TC_HEADER_OFFSET_KEY_AREA_CRC) != cuGetCrc32 (header + HEADER_MASTER_KEYDATA_OFFSET, MASTER_KEYDATA_SIZE))
+		return ERR_CRC_KEY_SET;
 
-            // Header version
-            headerVersion = cuGetHeaderField16 (header, TC_HEADER_OFFSET_VERSION);
-            if (headerVersion > VOLUME_HEADER_VERSION) {
-                return ERR_VERSION_REQUIRED;
-            }
-
-            // Check CRC of the header fields
-            if (headerVersion >= 4
-                    && cuGetHeaderField32 (header, TC_HEADER_OFFSET_HEADER_CRC) != cuGetCrc32 (header + TC_HEADER_OFFSET_MAGIC, TC_HEADER_OFFSET_HEADER_CRC - TC_HEADER_OFFSET_MAGIC))
-                //printf("Unsuccessful\n");
-                return ERR_CRC_HEADER_FIELDS;
-            // Required program version
-            //cryptoInfo->RequiredProgramVersion = GetHeaderField16 (header, TC_HEADER_OFFSET_REQUIRED_VERSION);
-            //cryptoInfo->LegacyVolume = cryptoInfo->RequiredProgramVersion < 0x600;
-
-            // Check CRC of the key set
-            if (cuGetHeaderField32 (header, TC_HEADER_OFFSET_KEY_AREA_CRC) != cuGetCrc32 (header + HEADER_MASTER_KEYDATA_OFFSET, MASTER_KEYDATA_SIZE))
-                return ERR_CRC_KEY_SET;
- 
     return SUCCESS;
 }
 
