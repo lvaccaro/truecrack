@@ -26,9 +26,11 @@
 #include "Pkcs5.cuh"
 #include "Xts.cuh"
 
+/* Constat gpu memory data */
 __device__ __constant__ unsigned char cHeaderEncrypted[TC_VOLUME_HEADER_EFFECTIVE_SIZE];
 __device__ __constant__ unsigned char cSalt[SALT_LENGTH];
 
+/* Header key size */
 #define MAXPKCS5OUTSIZE 64
 
 /* The max number of block grid; number of max parallel gpu blocks. */
@@ -59,6 +61,7 @@ int getMultiprocessorCount (void){
 //#define NUMBLOCKS		12
 #define NUMTHREADSXBLOCK	256
 
+// Handle GPU error
 static void HandleError( cudaError_t err, const char *file,  int line ) {
         if (err != cudaSuccess) {
                 printf( "%s in %s at line %d\n", cudaGetErrorString( err ),  file, line );
@@ -67,72 +70,8 @@ static void HandleError( cudaError_t err, const char *file,  int line ) {
 }
 #define HANDLE_ERROR( err ) (HandleError( err, __FILE__, __LINE__ ))
 
-/*
- __global__ void cuda_Kernel_charset (
-    	unsigned char *salt,
-    	unsigned char *headerEncrypted,
-    	unsigned short int charset_length,
-    	unsigned char *charset,
-    	unsigned short int password_length,
-    	uint64_t maxcombination,
-    	 short int *result, 
-	 int keyDerivationFunction)
- {
-	uint64_t numData = blockIdx.x*blockDim.x+threadIdx.x;
-	__align__(8) unsigned char headerkey[192];
-	__align__(8) unsigned char headerDecrypted[512];
-	__align__(8) unsigned char pwd[8];
 
-	//__device__ void computePwd (int number, int maxcombination, int charsetlength, unsigned char *charset, int wordlength, unsigned char *word){
-	computePwd(numData,maxcombination,charset_length,charset,password_length,pwd);
-	pwd[password_length]='\0';
-	
-	//__device__ void cuda_Pbkdf2_charset_ ( unsigned char *salt, unsigned char *pwd, int pwd_len, unsigned char *headerkey) {
-//	cuda_Pbkdf2 ( salt, pwd, password_length, headerkey);
-
-	int value=cuda_Xts (headerEncrypted, headerkey, headerDecrypted);
-	if (value==SUCCESS)
-		result[numData]=MATCH;
-	else
-		result[numData]=NOMATCH;
-}*/
-
-/*	
-__global__ void cuda_Kernel ( unsigned char *salt, unsigned char *headerEncrypted, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result, int max, int keyDerivationFunction) {
-	int value;
-	int numData=blockIdx.x*NUMTHREADSXBLOCK+threadIdx.x;
-
-	if (numData>=max) return;
-
-	// Array of unsigned char in the shared memory
-	__align__(8) unsigned char headerKey[192];
-	__align__(8) unsigned char headerDecrypted[512];
-
-	// Calculate the hash header key
-	unsigned char *pwd=blockPwd+blockPwd_init[numData];
-	int pwd_len = blockPwd_length[numData];
-
-
-	if(keyDerivationFunction==RIPEMD160)
-		cuda_Pbkdf2 ( salt, pwd, pwd_len, headerKey);
-	else if(keyDerivationFunction==SHA512)
-		cuda_derive_key_sha512 (  pwd, pwd_len, salt, PKCS5_SALT_SIZE, 1000, headerKey, 64);
-	else if(keyDerivationFunction==WHIRLPOOL)
-		cuda_derive_key_whirlpool (  pwd, pwd_len, salt, PKCS5_SALT_SIZE, 1000, headerKey, 64);
-	else
-		;
-	
-	// Decrypt the header and compare the key
-	value=cuda_Xts (headerEncrypted, headerKey,headerDecrypted);
-
-	if (value==SUCCESS)
-		result[numData]=MATCH;
-	else
-		result[numData]=NOMATCH;
-}
-*/
-
-
+// GPU kernel: build word from an alphabet
 __global__ void cuKernel_generate(unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, int offset, uint32_t maxsize, int charsetlength, unsigned char *charset, int wordlength){
     int number=blockIdx.x*NUMTHREADSXBLOCK+threadIdx.x;
     if (number>=maxsize) {blockPwd_init[number]=1;return;}
@@ -156,47 +95,214 @@ __global__ void cuKernel_generate(unsigned char *blockPwd, int *blockPwd_init, i
     	word[i]=charset[word[i]];
 }
 
-
+// GPU kernel: ripemd160 hash
 __global__ void cuKernel_ripemd160 (unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, unsigned char *headerKey, int max) {
 	int numData=blockIdx.x*NUMTHREADSXBLOCK+threadIdx.x;
 	if (numData>=max) return;
 	cuda_derive_key_ripemd160 (  blockPwd+blockPwd_init[numData], blockPwd_length[numData], cSalt, PKCS5_SALT_SIZE, 2000, headerKey+numData*MAXPKCS5OUTSIZE, 64);
 }
+// GPU kernel: sha512 hash
 __global__ void cuKernel_sha512 ( unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, unsigned char *headerKey, int max) {
 	int numData=blockIdx.x*NUMTHREADSXBLOCK+threadIdx.x;
 	if (numData>=max) return;
 	cuda_derive_key_sha512 (  blockPwd+blockPwd_init[numData], blockPwd_length[numData], cSalt, PKCS5_SALT_SIZE, 1000, headerKey+numData*MAXPKCS5OUTSIZE, 64);
 }
-
+// GPU kernel: whirlpool hash
 __global__ void cuKernel_whirlpool ( unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, unsigned char *headerKey, int max) {
        int numData=blockIdx.x*NUMTHREADSXBLOCK+threadIdx.x;
         if (numData>=max) return;
         cuda_derive_key_whirlpool (  blockPwd+blockPwd_init[numData], blockPwd_length[numData], cSalt, PKCS5_SALT_SIZE, 1000, headerKey+numData*MAXPKCS5OUTSIZE, 64);
 }
-
-__global__ void cuKernel_aes (unsigned char *headerDecrypted, unsigned char *headerKey, short int *result, int max) {
-	int value;
+// GPU kernel: aes xts decryption
+__global__ void cuKernel_aes ( unsigned char *headerKey, short int *result, int max) {
 	int numData=blockIdx.x*NUMTHREADSXBLOCK+threadIdx.x;
 	if (numData>=max) return;
-	//__align__(8) unsigned char headerDecrypted[512];
+	__align__(8) unsigned char headerDecrypted[512];
 	result[numData]=cuXts (AES,cHeaderEncrypted, headerKey+numData*MAXPKCS5OUTSIZE,headerDecrypted);
 }
-/*
-__global__ void cuKernel_serpent (unsigned char *headerDecrypted, unsigned char *headerKey, short int *result, int max) {
-	int value;
+// GPU kernel: serpent xts decryption
+__global__ void cuKernel_serpent ( unsigned char *headerKey, short int *result, int max) {
 	int numData=blockIdx.x*NUMTHREADSXBLOCK+threadIdx.x;
 	if (numData>=max) return;
-	//__align__(8) unsigned char headerDecrypted[512];
+	__align__(8) unsigned char headerDecrypted[512];
 	result[numData]=cuXts (SERPENT,cHeaderEncrypted, headerKey+numData*MAXPKCS5OUTSIZE,headerDecrypted);
 }
-__global__ void cuKernel_twofish(unsigned char *headerKey, short int *result, int max) {
-	int value;
+// GPU kernel: twofish xts decryption
+__global__ void cuKernel_twofish (unsigned char *headerKey, short int *result, int max) {
 	int numData=blockIdx.x*NUMTHREADSXBLOCK+threadIdx.x;
 	if (numData>=max) return;
 	__align__(8) unsigned char headerDecrypted[512];
 	result[numData]=cuXts (TWOFISH,cHeaderEncrypted, headerKey+numData*MAXPKCS5OUTSIZE,headerDecrypted);
 }
-*/
+
+// Perform the bruteforce on dictionary mode
+float cuda_Core_dictionary ( int encryptionAlgorithm, int bsize, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result, int keyDerivationFunction) {
+	// Initialization
+	int lengthpwd=0;
+	for (int j=0;j<bsize;j++) {
+		lengthpwd+=blockPwd_length[j];
+		result[j]=0;
+	}
+	// Copy memory datas from host to gpu
+	HANDLE_ERROR(cudaMemcpy(dev_blockPwd, 		blockPwd, 		lengthpwd * sizeof(unsigned char) , cudaMemcpyHostToDevice));
+	HANDLE_ERROR(cudaMemcpy(dev_blockPwd_init, 	blockPwd_init, 	bsize * sizeof(int) , cudaMemcpyHostToDevice));
+	HANDLE_ERROR(cudaMemcpy(dev_blockPwd_length,blockPwd_length,bsize * sizeof(int) , cudaMemcpyHostToDevice));
+	HANDLE_ERROR(cudaMemcpy(dev_result, 		result,			bsize * sizeof(short int) , cudaMemcpyHostToDevice));
+
+	// Calculate the block grid and threads for block
+	int numBlocks=bsize/NUMTHREADSXBLOCK+1;
+	int numThreads=NUMTHREADSXBLOCK;
+	if (bsize<NUMTHREADSXBLOCK)
+		numThreads=bsize;
+
+	// Start timer
+	cudaEvent_t tstart,tstop;
+	float time;
+	cudaEventCreate(&tstart);
+	cudaEventCreate(&tstop);
+	cudaEventRecord(tstart, 0);
+
+	// GPU Kernel: Key derivation function
+	switch(keyDerivationFunction){
+		case RIPEMD160:
+			cuKernel_ripemd160 <<<numBlocks,numThreads>>>(dev_blockPwd, dev_blockPwd_init, dev_blockPwd_length, dev_headerKey, bsize);
+			break;
+		case SHA512:
+			cuKernel_sha512 <<<numBlocks,numThreads>>>(dev_blockPwd, dev_blockPwd_init, dev_blockPwd_length, dev_headerKey,bsize);
+			break;
+		case WHIRLPOOL:
+			cuKernel_whirlpool <<<numBlocks,numThreads>>>(dev_blockPwd, dev_blockPwd_init, dev_blockPwd_length, dev_headerKey,bsize);
+			break;
+	}
+	
+	// GPU Kernel: Encryption algorithms
+	switch(encryptionAlgorithm){
+		case AES:
+			cuKernel_aes<<<numBlocks,numThreads>>>(dev_headerKey, dev_result, bsize);
+			break;
+		case SERPENT:
+			cuKernel_serpent<<<numBlocks,numThreads>>>(dev_headerKey, dev_result, bsize);
+			break;
+		case TWOFISH:
+			cuKernel_twofish<<<numBlocks,numThreads>>>(dev_headerKey, dev_result, bsize);
+			break;
+	}
+
+	// Stop timer
+	cudaEventRecord(tstop, 0);
+	cudaEventSynchronize(tstop);
+	cudaEventElapsedTime(&time, tstart, tstop);
+
+	// Copy memory result from gpu to host
+	HANDLE_ERROR(cudaMemcpy(result, dev_result,bsize* sizeof(short int) , cudaMemcpyDeviceToHost));
+	return time;
+}
+
+
+// Perform the bruteforce on charset mode
+float cuda_Core_charset ( int encryptionAlgorithm, uint64_t bsize, uint64_t start, unsigned short int charset_length, unsigned char *charset, unsigned short int password_length, short int *result, int keyDerivationFunction)
+{
+	// Initialization
+	int numBlocks=(int)(bsize/NUMTHREADSXBLOCK)+1;
+	int numThreads=NUMTHREADSXBLOCK;
+	if (bsize<NUMTHREADSXBLOCK)
+		numThreads=(int)bsize;
+		
+	// Copy memory datas from host to gpu
+	unsigned char *dev_charset = NULL;
+	HANDLE_ERROR(cudaMalloc((void **)&dev_charset, charset_length*sizeof(unsigned char)));
+	HANDLE_ERROR(cudaMemcpy(dev_charset, charset, charset_length*sizeof(unsigned char), cudaMemcpyHostToDevice));
+	/*
+	char host_blockPwd[bsize*PASSWORD_MAXSIZE];
+	int host_blockPwd_init[bsize];
+	int host_blockPwd_length[bsize];
+	*/
+	// Start timer
+    cudaEvent_t tstart,tstop;
+    float time;
+    cudaEventCreate(&tstart);
+    cudaEventCreate(&tstop);
+    cudaEventRecord(tstart, 0); 	
+
+	// GPU Kernel: generate passwords
+	cuKernel_generate <<<numBlocks,numThreads>>>(dev_blockPwd,dev_blockPwd_init,dev_blockPwd_length,(int)start,bsize,charset_length,dev_charset,password_length);
+	
+	// GPU Kernel: Key derivation function
+	switch(keyDerivationFunction){
+		case RIPEMD160:
+			cuKernel_ripemd160 <<<numBlocks,numThreads>>>(dev_blockPwd, dev_blockPwd_init, dev_blockPwd_length, dev_headerKey, bsize);
+			break;
+		case SHA512:
+			cuKernel_sha512 <<<numBlocks,numThreads>>>(dev_blockPwd, dev_blockPwd_init, dev_blockPwd_length, dev_headerKey,bsize);
+			break;
+		case WHIRLPOOL:
+			cuKernel_whirlpool <<<numBlocks,numThreads>>>(dev_blockPwd, dev_blockPwd_init, dev_blockPwd_length, dev_headerKey,bsize);
+			break;
+	}
+	
+	// GPU Kernel: Encryption algorithms
+	switch(encryptionAlgorithm){
+		case AES:
+			cuKernel_aes<<<numBlocks,numThreads>>>(dev_headerKey, dev_result, bsize);
+			break;
+		case SERPENT:
+			cuKernel_serpent<<<numBlocks,numThreads>>>(dev_headerKey, dev_result, bsize);
+			break;
+		case TWOFISH:
+			cuKernel_twofish<<<numBlocks,numThreads>>>(dev_headerKey, dev_result, bsize);
+			break;
+	}
+	
+	// Stop timer
+    cudaEventRecord(tstop, 0);
+    cudaEventSynchronize(tstop);
+    cudaEventElapsedTime(&time, tstart, tstop);
+	/*
+	HANDLE_ERROR( cudaMemcpy(host_blockPwd, dev_blockPwd, bsize*PASSWORD_MAXSIZE*sizeof(unsigned char), cudaMemcpyDeviceToHost));
+	HANDLE_ERROR( cudaMemcpy(host_blockPwd_init, dev_blockPwd_init, bsize*sizeof(int), cudaMemcpyDeviceToHost));
+	HANDLE_ERROR( cudaMemcpy(host_blockPwd_length, dev_blockPwd_length, bsize*sizeof(int), cudaMemcpyDeviceToHost));
+	printf("host_blockPwd_init: ");
+	for (int i=0;i<bsize;i++)
+	  printf("%d",host_blockPwd_init[i]);
+	printf("\nhost_blockPwd_length: ");
+	for (int i=0;i<bsize;i++)
+	  printf("%d",host_blockPwd_length[i]);
+	printf("\nhost_blockPwd: ");	
+	for (int i=0;i<bsize*PASSWORD_MAXSIZE;i++)
+	  printf("%c",host_blockPwd[i]);
+	printf("\n");
+	*/
+	// Copy memory result from gpu to host
+	HANDLE_ERROR( cudaMemcpy(result, dev_result, bsize*sizeof(short int), cudaMemcpyDeviceToHost));
+	HANDLE_ERROR(cudaFree(dev_charset));
+	return time;
+}
+   
+// GPU memory initialization: malloc anc constant symbols
+void cuda_Init (int bsize, unsigned char *salt, unsigned char *header) {
+	HANDLE_ERROR(cudaMalloc ( (void **)&dev_blockPwd, 		bsize*PASSWORD_MAXSIZE* sizeof(unsigned char))) ;
+	HANDLE_ERROR(cudaMalloc ( (void **)&dev_blockPwd_init,		bsize * sizeof(int))) ;
+	HANDLE_ERROR(cudaMalloc ( (void **)&dev_blockPwd_length, 	bsize * sizeof(int))) ;
+	HANDLE_ERROR(cudaMalloc ( (void **)&dev_headerKey, 		MAXPKCS5OUTSIZE * bsize * sizeof(unsigned char))) ;
+	HANDLE_ERROR(cudaMalloc ( (void **)&dev_result, 		bsize * sizeof(short int)))  ;
+	HANDLE_ERROR(cudaMemcpyToSymbol( cSalt, 		salt , SALT_LENGTH* sizeof(unsigned char),0,cudaMemcpyHostToDevice)) ;
+	HANDLE_ERROR(cudaMemcpyToSymbol( cHeaderEncrypted, 	header , TC_VOLUME_HEADER_EFFECTIVE_SIZE* sizeof(unsigned char),0,cudaMemcpyHostToDevice)) ;
+  
+}
+
+// GPU memory free and reset
+void cuda_Free(void) {
+	cudaFree(dev_salt);
+	cudaFree(dev_blockPwd);
+	cudaFree(dev_blockPwd_init);
+	cudaFree(dev_blockPwd_length);
+	cudaFree(dev_result);
+	cudaFree(dev_headerKey);
+	cudaDeviceReset();
+}
+
+
+// LEGACY: 
 /*
 void cuda_Core_dictionary ( int block_currentsize, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result, int keyDerivationFunction) {
 
@@ -283,178 +389,67 @@ void cuda_Core_dictionary ( int block_currentsize, unsigned char *blockPwd, int 
 }
 */
 
-float cuda_Core_dictionary ( int encryptionAlgorithm, int bsize, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result, int keyDerivationFunction) {
-	int lengthpwd=0;
-	for (int j=0;j<bsize;j++) {
-		lengthpwd+=blockPwd_length[j];
-		result[j]=0;
-	}
-	
-	HANDLE_ERROR(cudaMemcpy(dev_blockPwd, 		blockPwd, 	lengthpwd * sizeof(unsigned char) , cudaMemcpyHostToDevice));
-	HANDLE_ERROR(cudaMemcpy(dev_blockPwd_init, 	blockPwd_init, 	bsize * sizeof(int) , cudaMemcpyHostToDevice));
-	HANDLE_ERROR(cudaMemcpy(dev_blockPwd_length, 	blockPwd_length,bsize * sizeof(int) , cudaMemcpyHostToDevice));
-	HANDLE_ERROR(cudaMemcpy(dev_result, 		result,		bsize * sizeof(short int) , cudaMemcpyHostToDevice));
+/*
+ __global__ void cuda_Kernel_charset (
+    	unsigned char *salt,
+    	unsigned char *headerEncrypted,
+    	unsigned short int charset_length,
+    	unsigned char *charset,
+    	unsigned short int password_length,
+    	uint64_t maxcombination,
+    	 short int *result, 
+	 int keyDerivationFunction)
+ {
+	uint64_t numData = blockIdx.x*blockDim.x+threadIdx.x;
+	__align__(8) unsigned char headerkey[192];
+	__align__(8) unsigned char headerDecrypted[512];
+	__align__(8) unsigned char pwd[8];
 
-	int numBlocks=bsize/NUMTHREADSXBLOCK+1;
-	int numThreads=NUMTHREADSXBLOCK;
-	if (bsize<NUMTHREADSXBLOCK)
-		numThreads=bsize;
+	//__device__ void computePwd (int number, int maxcombination, int charsetlength, unsigned char *charset, int wordlength, unsigned char *word){
+	computePwd(numData,maxcombination,charset_length,charset,password_length,pwd);
+	pwd[password_length]='\0';
+	
+	//__device__ void cuda_Pbkdf2_charset_ ( unsigned char *salt, unsigned char *pwd, int pwd_len, unsigned char *headerkey) {
+//	cuda_Pbkdf2 ( salt, pwd, password_length, headerkey);
 
-	cudaEvent_t tstart,tstop;
-	float time;
-	cudaEventCreate(&tstart);
-	cudaEventCreate(&tstop);
-	cudaEventRecord(tstart, 0);
+	int value=cuda_Xts (headerEncrypted, headerkey, headerDecrypted);
+	if (value==SUCCESS)
+		result[numData]=MATCH;
+	else
+		result[numData]=NOMATCH;
+}*/
 
-	switch(keyDerivationFunction){
-		case RIPEMD160:
-			cuKernel_ripemd160 <<<numBlocks,numThreads>>>(dev_blockPwd, dev_blockPwd_init, dev_blockPwd_length, dev_headerKey, bsize);
-			break;
-		case SHA512:
-			cuKernel_sha512 <<<numBlocks,numThreads>>>(dev_blockPwd, dev_blockPwd_init, dev_blockPwd_length, dev_headerKey,bsize);
-			break;
-		case WHIRLPOOL:
-			cuKernel_whirlpool <<<numBlocks,numThreads>>>(dev_blockPwd, dev_blockPwd_init, dev_blockPwd_length, dev_headerKey,bsize);
-			break;
-	}
-	
-	unsigned char headerKey[50000]={0};
-	HANDLE_ERROR(cudaMemcpy(headerKey, dev_headerKey,MAXPKCS5OUTSIZE * bsize * sizeof(unsigned char) , cudaMemcpyDeviceToHost));
-	for (int i=0;i<MAXPKCS5OUTSIZE * bsize * sizeof(unsigned char);i++)
-		printf("%02x",headerKey[i]);
-	printf(" -> ");
-		
-	unsigned char headerDecrypted[512];
-	for (int k=0;k<512;k++)
-		headerDecrypted[k]=0;
-	unsigned char* dev_headerDecrypted;
-	HANDLE_ERROR(cudaMalloc((void **)&dev_headerDecrypted, 512*bsize*sizeof(unsigned char)));
-	HANDLE_ERROR(cudaMemcpy(dev_headerDecrypted, headerDecrypted, 512*bsize*sizeof(unsigned char), cudaMemcpyHostToDevice));
-	
-	
-	switch(encryptionAlgorithm){
-		case AES:
-			cuKernel_aes<<<numBlocks,numThreads>>>(dev_headerDecrypted,dev_headerKey, dev_result, bsize);
-			break;
-		case SERPENT:
-			//cuKernel_serpent<<<numBlocks,numThreads>>>(dev_headerDecrypted,dev_headerKey, dev_result, bsize);
-			break;
-		case TWOFISH:
-			//cuKernel_twofish<<<numBlocks,numThreads>>>(dev_headerKey, dev_result, bsize);
-			break;
-	}
+/*	
+__global__ void cuda_Kernel ( unsigned char *salt, unsigned char *headerEncrypted, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result, int max, int keyDerivationFunction) {
+	int value;
+	int numData=blockIdx.x*NUMTHREADSXBLOCK+threadIdx.x;
+
+	if (numData>=max) return;
+
+	// Array of unsigned char in the shared memory
+	__align__(8) unsigned char headerKey[192];
+	__align__(8) unsigned char headerDecrypted[512];
+
+	// Calculate the hash header key
+	unsigned char *pwd=blockPwd+blockPwd_init[numData];
+	int pwd_len = blockPwd_length[numData];
 
 
-	cudaEventRecord(tstop, 0);
-	cudaEventSynchronize(tstop);
-	cudaEventElapsedTime(&time, tstart, tstop);
+	if(keyDerivationFunction==RIPEMD160)
+		cuda_Pbkdf2 ( salt, pwd, pwd_len, headerKey);
+	else if(keyDerivationFunction==SHA512)
+		cuda_derive_key_sha512 (  pwd, pwd_len, salt, PKCS5_SALT_SIZE, 1000, headerKey, 64);
+	else if(keyDerivationFunction==WHIRLPOOL)
+		cuda_derive_key_whirlpool (  pwd, pwd_len, salt, PKCS5_SALT_SIZE, 1000, headerKey, 64);
+	else
+		;
+	
+	// Decrypt the header and compare the key
+	value=cuda_Xts (headerEncrypted, headerKey,headerDecrypted);
 
-	HANDLE_ERROR(cudaMemcpy(result, dev_result,bsize* sizeof(short int) , cudaMemcpyDeviceToHost));
-	HANDLE_ERROR(cudaMemcpy(headerDecrypted, dev_headerDecrypted,512*bsize* sizeof(unsigned char) , cudaMemcpyDeviceToHost));
-	
-	for (int i=0;i< 512*bsize;i++)
-		printf("%02x",headerDecrypted[i]);
-	printf(" ->");
-	
-	for (int i=0;i< bsize;i++)
-		printf("%d",result[i]);
-	printf("\n");
-	
-	return time;
+	if (value==SUCCESS)
+		result[numData]=MATCH;
+	else
+		result[numData]=NOMATCH;
 }
-
-
-float cuda_Core_charset ( int encryptionAlgorithm, uint64_t bsize, uint64_t start, unsigned short int charset_length, unsigned char *charset, unsigned short int password_length, short int *result, int keyDerivationFunction)
-{
-	int numBlocks=(int)(bsize/NUMTHREADSXBLOCK)+1;
-	int numThreads=NUMTHREADSXBLOCK;
-	if (bsize<NUMTHREADSXBLOCK)
-		numThreads=(int)bsize;
-	
-	unsigned char *dev_charset = NULL;
-	HANDLE_ERROR(cudaMalloc((void **)&dev_charset, charset_length*sizeof(unsigned char)));
-	HANDLE_ERROR(cudaMemcpy(dev_charset, charset, charset_length*sizeof(unsigned char), cudaMemcpyHostToDevice));
-	/*
-	char host_blockPwd[bsize*PASSWORD_MAXSIZE];
-	int host_blockPwd_init[bsize];
-	int host_blockPwd_length[bsize];
-	*/
-        cudaEvent_t tstart,tstop;
-        float time;
-        cudaEventCreate(&tstart);
-        cudaEventCreate(&tstop);
-        cudaEventRecord(tstart, 0); 	
-
-	cuKernel_generate <<<numBlocks,numThreads>>>(dev_blockPwd,dev_blockPwd_init,dev_blockPwd_length,(int)start,bsize,charset_length,dev_charset,password_length);
-	
-	
-	switch(keyDerivationFunction){
-		case RIPEMD160:
-			cuKernel_ripemd160 <<<numBlocks,numThreads>>>(dev_blockPwd, dev_blockPwd_init, dev_blockPwd_length, dev_headerKey, bsize);
-			break;
-		case SHA512:
-			cuKernel_sha512 <<<numBlocks,numThreads>>>(dev_blockPwd, dev_blockPwd_init, dev_blockPwd_length, dev_headerKey,bsize);
-			break;
-		case WHIRLPOOL:
-			cuKernel_whirlpool <<<numBlocks,numThreads>>>(dev_blockPwd, dev_blockPwd_init, dev_blockPwd_length, dev_headerKey,bsize);
-			break;
-	}
-	
-	switch(encryptionAlgorithm){
-		case AES:
-			//cuKernel_aes<<<numBlocks,numThreads>>>(dev_headerKey, dev_result, bsize);
-			break;
-		case SERPENT:
-			//cuKernel_serpent<<<numBlocks,numThreads>>>(dev_headerKey, dev_result, bsize);
-			break;
-		case TWOFISH:
-			//cuKernel_twofish<<<numBlocks,numThreads>>>(dev_headerKey, dev_result, bsize);
-			break;
-	}
-	
-        cudaEventRecord(tstop, 0);
-        cudaEventSynchronize(tstop);
-        cudaEventElapsedTime(&time, tstart, tstop);
-	/*
-	HANDLE_ERROR( cudaMemcpy(host_blockPwd, dev_blockPwd, bsize*PASSWORD_MAXSIZE*sizeof(unsigned char), cudaMemcpyDeviceToHost));
-	HANDLE_ERROR( cudaMemcpy(host_blockPwd_init, dev_blockPwd_init, bsize*sizeof(int), cudaMemcpyDeviceToHost));
-	HANDLE_ERROR( cudaMemcpy(host_blockPwd_length, dev_blockPwd_length, bsize*sizeof(int), cudaMemcpyDeviceToHost));
-	printf("host_blockPwd_init: ");
-	for (int i=0;i<bsize;i++)
-	  printf("%d",host_blockPwd_init[i]);
-	printf("\nhost_blockPwd_length: ");
-	for (int i=0;i<bsize;i++)
-	  printf("%d",host_blockPwd_length[i]);
-	printf("\nhost_blockPwd: ");	
-	for (int i=0;i<bsize*PASSWORD_MAXSIZE;i++)
-	  printf("%c",host_blockPwd[i]);
-	printf("\n");
-	*/
-	HANDLE_ERROR( cudaMemcpy(result, dev_result, bsize*sizeof(short int), cudaMemcpyDeviceToHost));
-	HANDLE_ERROR(cudaFree(dev_charset));
-	return time;
-}
-   
-
-void cuda_Init (int bsize, unsigned char *salt, unsigned char *header) {
-	HANDLE_ERROR(cudaMalloc ( (void **)&dev_blockPwd, 		bsize*PASSWORD_MAXSIZE* sizeof(unsigned char))) ;
-	HANDLE_ERROR(cudaMalloc ( (void **)&dev_blockPwd_init,		bsize * sizeof(int))) ;
-	HANDLE_ERROR(cudaMalloc ( (void **)&dev_blockPwd_length, 	bsize * sizeof(int))) ;
-	HANDLE_ERROR(cudaMalloc ( (void **)&dev_headerKey, 		MAXPKCS5OUTSIZE * bsize * sizeof(unsigned char))) ;
-	HANDLE_ERROR(cudaMalloc ( (void **)&dev_result, 		bsize * sizeof(short int)))  ;
-	HANDLE_ERROR(cudaMemcpyToSymbol( cSalt, 		salt , SALT_LENGTH* sizeof(unsigned char),0,cudaMemcpyHostToDevice)) ;
-	HANDLE_ERROR(cudaMemcpyToSymbol( cHeaderEncrypted, 	header , TC_VOLUME_HEADER_EFFECTIVE_SIZE* sizeof(unsigned char),0,cudaMemcpyHostToDevice)) ;
-  
-}
-
-void cuda_Free(void) {
-	cudaFree(dev_salt);
-	cudaFree(dev_blockPwd);
-	cudaFree(dev_blockPwd_init);
-	cudaFree(dev_blockPwd_length);
-	cudaFree(dev_result);
-	cudaFree(dev_headerKey);
-		
-	cudaDeviceReset();
-
-}
+*/

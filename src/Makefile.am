@@ -31,14 +31,14 @@ CFLAGS += -D_GPU_
 OBJS_COMMON += #gpuCrypto.o
 COMPILER=$(NVCC)
 # CUDA code generation flags
-#GENCODE_SM10= -gencode arch=compute_10,code=sm_10
+#GENCODE_SM11= -gencode arch=compute_11,code=sm_11
 #GENCODE_SM20= -gencode arch=compute_20,code=sm_20
-#GENCODE_SM30= -gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35
-#GENCODE_FLAGS= $(GENCODE_SM10) $(GENCODE_SM20) $(GENCODE_SM30)
-#CFLAGS += $(GENCODE_FLAGS) -ftz=true -use_fast_math
+GENCODE_SM30= -gencode arch=compute_30,code=sm_30 #-gencode arch=compute_35,code=sm_35
+GENCODE_FLAGS= $(GENCODE_SM30)
+CFLAGS += $(GENCODE_FLAGS) -ftz=true -use_fast_math
 #CFLAGS += -arch=sm_11 
 #CFLAGS += -arch=sm_30
-CFLAGS += -ftz=true -use_fast_math
+#CFLAGS += -ftz=true -use_fast_math
 endif
 
 
@@ -52,6 +52,8 @@ $(OBJ_CUDA):
 	cat Cuda/Core.cu > Cuda.cu 
 	cat Cuda/Pkcs5.cu >> Cuda.cu
 	cat Cuda/Aes.cu >> Cuda.cu
+	cat Cuda/Serpent.cu >> Cuda.cu
+	cat Cuda/Twofish.cu >> Cuda.cu
 	cat Cuda/Crypto.cu >> Cuda.cu
 	cat Cuda/Xts.cu >> Cuda.cu
 	cat Cuda/Rmd160.alternative.cu >> Cuda.cu

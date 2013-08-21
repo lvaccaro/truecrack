@@ -38,10 +38,7 @@
 //#include "EncryptionThreadPool.h"
 //#endif
 #include "Volumes.cuh"
-#define max(x, y) (((x) > (y)) ? (x) : (y))
-
-#define min(x, y) (((x) < (y)) ? (x) : (y))
-
+#include "Twofish.cuh"
 
 
 /*
@@ -145,11 +142,11 @@ __device__ int cuCipherInit (int cipher, unsigned char *key, unsigned __int8 *ks
 			break;
 			
 		case SERPENT:
-			//serpent_set_key (key, 32 * 8, ks);
+			serpent_set_key (key, 32 *8, ks);
 			break;
 			
 		case TWOFISH:
-			//twofish_set_key ((TwofishInstance *)ks, (const u4byte *)key, 32 * 8);
+			twofish_set_key ((TwofishInstance *)ks, (const u4byte *)key, 32 * 8);
 			break;
 		default:
 			// Unknown/wrong cipher ID
@@ -182,10 +179,10 @@ __device__ void cuEncipherBlock(int cipher, void *data, void *ks)
 			aes_encrypt ((const unsigned char*)data, (unsigned char*)data, (const aes_encrypt_ctx *)ks);
 			break;
 		case TWOFISH:
-			//twofish_encrypt ((TwofishInstance *)ks, (const unsigned int *)data, (unsigned int *)data);
+			twofish_encrypt ((TwofishInstance *)ks, (const unsigned int *)data, (unsigned int *)data);
 			break;
 		case SERPENT:
-			//serpent_encrypt ((const unsigned char *)data, (unsigned char *)data, (unsigned char *)ks);
+			serpent_encrypt ((const unsigned char *)data, (unsigned char *)data, (unsigned char *)ks);
 			break;
 		default:
 			;//TC_THROW_FATAL_EXCEPTION;	// Unknown/wrong ID
@@ -207,57 +204,14 @@ __device__ void cuDecipherBlock(int cipher, void *data, void *ks)
 			break;
 #endif
 		case SERPENT:
-			//serpent_decrypt ((const unsigned char *)data, (unsigned char *)data, (unsigned char *)ks);
+			serpent_decrypt ((const unsigned char *)data, (unsigned char *)data, (unsigned char *)ks);
 			break;
 		case TWOFISH:
-			//twofish_decrypt ((TwofishInstance *)ks, (const unsigned int *)data, (unsigned int *)data);
+			twofish_decrypt ((TwofishInstance *)ks, (const unsigned int *)data, (unsigned int *)data);
 			break;
 		default:
 			;//TC_THROW_FATAL_EXCEPTION;	// Unknown/wrong ID
     }
 }
 
-__device__ void cuDecipherBlocks (int cipher, void *dataPtr, void *ks, size_t blockCount)
-{
-		byte *data = (byte*)dataPtr;
-
-		size_t blockSize = 16;
-		while (blockCount-- > 0)
-		{
-			cuDecipherBlock (cipher, data, ks);
-			data += blockSize;
-		}
-}
-
-__device__ int cuEAInit (int ea, unsigned char *key, unsigned __int8 *ks)
-{
-    int retVal = ERR_SUCCESS;
-	
-    if (ea == 0)
-        return ERR_CIPHER_INIT_FAILURE;
-    //for (c = EAGetFirstCipher (ea); c != 0; c = EAGetNextCipher (ea, c))
-    //{
-    switch (cuCipherInit (ea, key, ks))
-    {
-		case ERR_CIPHER_INIT_FAILURE:
-			return ERR_CIPHER_INIT_FAILURE;
-			
-		case ERR_CIPHER_INIT_WEAK_KEY:
-			retVal = ERR_CIPHER_INIT_WEAK_KEY;              // Non-fatal error
-			break;
-    }
-	
-    //key += CipherGetKeySize (c);
-    //ks += CipherGetKeyScheduleSize (c);
-    //}
-    return retVal;
-}
-
-__device__ BOOL cuEAInitMode (PCRYPTO_INFO ci)
-{
-    // Secondary key schedule
-    if (cuEAInit (ci->ea, ci->km2, ci->ks2) != ERR_SUCCESS)
-        return FALSE;
-    return TRUE;
-}
 
