@@ -1,4 +1,7 @@
-EXAMPLES
+TRUECRACK v3.3: EXAMPLES
+------------------------
+website: http://www.truecrack.net , http://code.google.com/p/truecrack
+mail:    infotruecrack@gmail.com
 
 1. Standard volume with different key derivation functions: password "test"
 - PKCS5 hmac-ripemd160 & AES-XTS : truecrack -t ripemd160_aes.test.tc -w passwords.txt
@@ -19,3 +22,5 @@ EXAMPLES
 5. Hidden volume from backup header: password "test", password hidden area "hidden"
 - PKCS5 hmac-ripemd160 & AES-XTS : truecrack -t ripemd160_aes.test.tc -w passwords.txt -H -b
 
+6. Partition/device-hosted: password "test"
+- PKCS5 hmac-ripemd160 & AES-XTS : truecrack -t /dev/sdb1 -w passwords.txt
