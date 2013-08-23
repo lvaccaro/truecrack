@@ -44,7 +44,7 @@ void print_usage (FILE* stream, int exit_code)
 		" %s -t truecrypt_file -c alphabet [-s minlength] -m maxlength [-k ripemd160 | -k sha512 | -k whirlpool] [-e aes | -e serpent | -e twofish] [-a blocks] [-b] [-H] [-r number]\n"
 		, program_name, program_name, program_name, program_name);
     fprintf (stream, "\nOptions:\n"
-		" -h --help						Display this information.\n"
+		" -h --help					Display this information.\n"
 		" -t --truecrypt <truecrypt_file>		Truecrypt volume file.\n"
 		" -k --key <ripemd160 | sha512 | whirlpool>	Key derivation function (default ripemd160).\n"
 		" -e --encryption <aes | serpent | twofish>	Encryption algorithm (default aes).\n"
@@ -54,9 +54,9 @@ void print_usage (FILE* stream, int exit_code)
 		" -s --startlength <minlength>			Starting length of passwords, for Alphabet attack (default 1).\n"
 		" -m --maxlength <maxlength>			Maximum length of passwords, for Alphabet attack.\n"
 		" -r --restore <number>				Restore the computation.\n"
-		" -b --backup						Backup header instead of volume header.\n"
-		" -H --hidden						Hidden Truecrypt volume.\n"
-		" -v --verbose						Show computation messages.\n"
+		" -b --backup					Backup header instead of volume header.\n"
+		" -H --hidden					Hidden Truecrypt volume.\n"
+		" -v --verbose					Show computation messages.\n"
 		);
     fprintf (stream, "\nSample for Dictionary attack:\n"
 	" %s -t volume.tc -w dictionary.txt \n"

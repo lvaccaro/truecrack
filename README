@@ -1,18 +1,19 @@
-TRUECRACK v3.2
+TRUECRACK v3.3
 --------------
 website: http://www.truecrack.net , http://code.google.com/p/truecrack
 mail:    infotruecrack@gmail.com
 
 1. WHAT TrueCrack IS?
-TrueCrack is a brute-force password cracker for TrueCrypt? (Copyrigth) volume files. It works on Linux and it is optimized for Nvidia Cuda technology.
+TrueCrack is a brute-force password cracker for TrueCrypt? (Copyrigth) volumes. It works on Linux and it is optimized for Nvidia Cuda technology.
 It supports:
 - PBKDF2 (defined in PKCS5 v2.0) based on key derivation functions: Ripemd160, Sha512 and Whirlpool.
 - XTS block cipher mode for hard disk encryption based on encryption algorithms: AES, SERPENT, TWOFISH.
-- Hidden Truecrypt volumes and backup headers. 
+- File-hosted (container) and Partition/device-hosted.
+- Hidden volumes and Backup headers. 
 TrueCrack is able to perform a brute-force attack based on:
 - Dictionary: read the passwords from a file of words.
 - Alphabet: generate all passwords of given length from given alphabet. 
-TrueCrack works on gpu and cpu. In gpu, TrueCrack requires a lots of resources. We suggest to run TrueCrack in a remote session without Xserver and framebuffer. 
+TrueCrack works on gpu and cpu. TrueCrack requires a lots of resources: we suggest a dedicated gpu board.
 
 2. HOW TO RUN?
 Dictionary attack:
@@ -26,7 +27,7 @@ Alphabet attack:
 -k 	--key <ripemd160 | sha512 | whirlpool>	Key derivation function (default ripemd160).
 -e 	--encryption <aes | serpent | twofish>	Encryption algorithm (default aes).
 -a 	--aggressive <blocks>			Number of parallel computations (board dependent).
--w 	--wordlist <wordlist_file> 		File of words, for Sictionary attack.
+-w 	--wordlist <wordlist_file> 		File of words, for Dictionary attack.
 -c 	--charset <alphabet>			Alphabet generator, for Alphabet attack.
 -m 	--maxlength <maxlength>			Maximum length of passwords, for Alphabet attack.
 -s	--startlength <minlength>       	Starting length of passwords, for Alphabet attack (default 1).
