@@ -77,7 +77,7 @@ AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = -g -I./Common/ -I./Crypto/ -I./Cuda/ -I./Main/ -I./ \
-	-I/usr/local/cuda-5.0/include/ $(am__append_1) $(am__append_2) \
+	-I/usr/local/cuda/include/ $(am__append_1) $(am__append_2) \
 	$(am__append_5)
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
@@ -183,7 +183,7 @@ LFLAGS = -lm -O3
 # CUDA code generation flags
 @ENABLE_CPU_FALSE@GENCODE_SM10 = -gencode arch=compute_10,code=sm_10
 @ENABLE_CPU_FALSE@GENCODE_SM20 = -gencode arch=compute_20,code=sm_20
-@ENABLE_CPU_FALSE@GENCODE_SM30 = -gencode arch=compute_30,code=sm_30 #-gencode arch=compute_35,code=sm_35
+@ENABLE_CPU_FALSE@GENCODE_SM30 = -gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35
 @ENABLE_CPU_FALSE@GENCODE_FLAGS = $(GENCODE_SM10) $(GENCODE_SM20) $(GENCODE_SM30)
 truecrack_SOURCES = 
 truecrack_CFLAGS = $(CUDA_CFLAGS)
@@ -417,9 +417,6 @@ uninstall-am: uninstall-binPROGRAMS
 	mostlyclean mostlyclean-compile mostlyclean-generic pdf pdf-am \
 	ps ps-am uninstall uninstall-am uninstall-binPROGRAMS
 
-#CFLAGS += -arch=sm_11 
-#CFLAGS += -arch=sm_30
-#CFLAGS += -ftz=true -use_fast_math
 
 all: truecrack
 

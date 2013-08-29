@@ -119,10 +119,6 @@ void cpu_Core_dictionary(int encryptionAlgorithm, int blocksize, unsigned char *
     		perror("Key derivation function not supported");
     		return;
     	}
-
-		for (j=0;j<cpu_GetMaxPkcs5OutSize();j++)
-			printf("%02x",headerKey[j]);
-		printf("\n");
 		
         result[i]=cpu_Xts(encryptionAlgorithm,encryptedHeader,headerKey,cpu_GetMaxPkcs5OutSize(), NULL, NULL);
 		if (result[i]==SUCCESS)
@@ -346,10 +342,6 @@ int cpu_Xts(int encryptionAlgorithm, char *encryptedHeader, char *headerKey, int
 
     // Try to decrypt header
     cpu_DecryptBuffer (header + HEADER_ENCRYPTED_DATA_OFFSET, HEADER_ENCRYPTED_DATA_SIZE, cryptoInfo);
-
-	for (i=0;i<512;i++)
-		printf("%02x",(unsigned char)header[i]);
-	printf("\n");
 	
     // Magic 'TRUE'
     if (GetHeaderField32 (header, TC_HEADER_OFFSET_MAGIC) != 0x54525545)
