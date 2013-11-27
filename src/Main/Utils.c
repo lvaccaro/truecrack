@@ -116,7 +116,7 @@ int file_readHeader(char *volumePath, char *header, int backup, int hidden) {
     fp=fopen(volumePath,"r");
     if (fp == NULL) {
         perror ("Error opening volume file");
-        return ;
+        return 0;
     }
 
    if (backup==0 && hidden==0)
