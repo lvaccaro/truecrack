@@ -408,7 +408,6 @@ void core(void){
 	void core_charset(void) {
 
 		/* Local variables */
-		short int status=0;			// value for the found rigth key
 		uint64_t j;				// counters for temporany cycles
 
 
@@ -455,12 +454,15 @@ void core(void){
 			for (;iblock<maxcombination && status==0;iblock+=1){
 				computePwd (iblock, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
 				word[wordlength]='\0';
-				value=cpu_Core_charset ( CORE_encryptionAlgorithm,header, CORE_charset, word,  wordlength,CORE_keyDerivationFunction);
+				value=cpu_Core_charset ( CORE_encryptionAlgorithm,header, CORE_charset, word,  wordlength,CORE_keyDerivationFunction, CORE_prefix);
 
 				if (value==1)
 					status=1;
 				if (CORE_verbose){
 					printf("%llu\t",count);
+					if (CORE_prefix!=NULL)
+						for (j=0;j<strlen(CORE_prefix);j++)
+							printf("%c",CORE_prefix[j]);
 					for (j=0;j<wordlength;j++)
 						printf("%c",word[j]);
 					printf("\t");
@@ -486,6 +488,13 @@ void core(void){
 			password_size=wordlength;
 			computePwd (iblock, maxcombination, strlen(CORE_charset),CORE_charset, password_size, password);
 			password[password_size]='\0';
+			if(CORE_prefix!=NULL){
+				char tmp[MAXWORDSIZE];
+				strncpy(tmp,password,password_size);
+				strncpy(password,CORE_prefix,strlen(CORE_prefix));
+				strncpy(password+strlen(CORE_prefix),tmp,password_size);
+				password_size=strlen(password);
+			}	
 		} 
 	}
 #endif

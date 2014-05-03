@@ -20,7 +20,7 @@
 #define HEADER_CORE
 
 #define SOFTWARE	"TrueCrack"
-#define VERSION		"3.5"
+#define VERSION		"3.6"
 #define WEBSITE		"http://code.google.com/p/truecrack"
 #define AUTHOR		"Luca Vaccaro"
 #define EMAIL		"infotruecrack@gmail.com"
@@ -61,7 +61,8 @@ int CORE_backup;
 int CORE_hidden;
 /* Encryption Algorithm */
 int CORE_encryptionAlgorithm;
-
+/* Prefix string */
+unsigned char *CORE_prefix;
 /* Main function */
 void core(void);
 
