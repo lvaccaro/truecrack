@@ -35,5 +35,5 @@ enum{
 };
 
 void cpu_Core_dictionary(int encryptionAlgorithm,int blocksize, unsigned char *encryptedHeader, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result, int keyDerivationFunction) ;
-int cpu_Core_charset(int encryptionAlgorithm,unsigned char *encryptedHeader, unsigned char *CORE_charset, unsigned char *word, int wordlength, int keyDerivationFunction) ;
+int cpu_Core_charset(int encryptionAlgorithm,unsigned char *encryptedHeader, unsigned char *CORE_charset, unsigned char *word, int wordlength, int keyDerivationFunction, unsigned char * prefix) ;
 #endif

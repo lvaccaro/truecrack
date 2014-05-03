@@ -1,4 +1,4 @@
-TRUECRACK v3.5
+TRUECRACK v3.6
 --------------
 website: http://www.truecrack.net , http://code.google.com/p/truecrack
 mail:    infotruecrack@gmail.com
@@ -19,7 +19,7 @@ TrueCrack works on gpu and cpu. TrueCrack requires a lots of resources: we sugge
 Dictionary attack:
 	truecrack -t truecrypt_file -w passwords_file [-k ripemd160 | -k sha512 | -k whirlpool] [-e aes | -e serpent | -e twofish] [-a blocks] [-b] [-H] [-r number]
 Alphabet attack:
-	truecrack -t truecrypt_file -c alphabet [-s minlength] -m maxlength [-k ripemd160 | -k sha512 | -k whirlpool] [-e aes | -e serpent | -e twofish] [-a blocks] [-b] [-H] [-r number]
+	truecrack -t truecrypt_file -c alphabet [-s minlength] -m maxlength [-p string] [-k ripemd160 | -k sha512 | -k whirlpool] [-e aes | -e serpent | -e twofish] [-a blocks] [-b] [-H] [-r number]
 
 3. HOW TO USAGE?
 -h 	--help 					Display this information.
@@ -31,6 +31,7 @@ Alphabet attack:
 -c 	--charset <alphabet>			Alphabet generator, for Alphabet attack.
 -m 	--maxlength <maxlength>			Maximum length of passwords, for Alphabet attack.
 -s	--startlength <minlength>       	Starting length of passwords, for Alphabet attack (default 1).
+-p	--prefix <string>			Prefix the first part of the password, for Alphabet attack.
 -r	--restore <number>              	Restore the computation.
 -b	--backup 				Backup header instead of volume header.
 -H	--hidden				Hidden Truecrypt volume.
