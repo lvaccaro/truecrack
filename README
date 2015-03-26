@@ -1,6 +1,6 @@
 TRUECRACK v3.6
 --------------
-website: http://www.truecrack.net , http://code.google.com/p/truecrack
+website: https://github.com/lvaccaro/truecrack
 mail:    infotruecrack@gmail.com
 
 1. WHAT TrueCrack IS?
@@ -15,13 +15,21 @@ TrueCrack is able to perform a brute-force attack based on:
 - Alphabet: generate all passwords of given length from given alphabet. 
 TrueCrack works on gpu and cpu. TrueCrack requires a lots of resources: we suggest a dedicated gpu board.
 
-2. HOW TO RUN?
+2. PERFORMANCE
+
+The execution time of TrueCrack? for a dictionary attack is (average word length 10 characters):
+	CPU 3.00GHz 	GTX650 	GTX680
+1000 	0m 12.031s 	0m 3.771s 	0m 2.693s
+10000 	2m 0.421s 	0m 15.893s 	0m 5.628s
+100000 	20 m3.811s 	2m 20.379s 	0m 37.610s 
+
+3. HOW TO RUN?
 Dictionary attack:
 	truecrack -t truecrypt_file -w passwords_file [-k ripemd160 | -k sha512 | -k whirlpool] [-e aes | -e serpent | -e twofish] [-a blocks] [-b] [-H] [-r number]
 Alphabet attack:
 	truecrack -t truecrypt_file -c alphabet [-s minlength] -m maxlength [-p string] [-k ripemd160 | -k sha512 | -k whirlpool] [-e aes | -e serpent | -e twofish] [-a blocks] [-b] [-H] [-r number]
 
-3. HOW TO USAGE?
+4. HOW TO USAGE?
 -h 	--help 					Display this information.
 -t 	--truecrypt <truecrypt_file> 		Truecrypt volume file.
 -k 	--key <ripemd160 | sha512 | whirlpool>	Key derivation function (default ripemd160).
@@ -37,19 +45,19 @@ Alphabet attack:
 -H	--hidden				Hidden Truecrypt volume.
 -v 	--verbose 				Show verbose messages.
 
-4. HOW TO CONFIGURE?
+5. HOW TO CONFIGURE?
 ./configure
 	--enable-debug : enable nVidia CUDA debug mode [default=no]
 	--enable-cpu : disable cuda nvidia GPU and use CPU [default=no]
 	--with-cuda=PATH : prefix where cuda is installed [default=auto]
 
-5. HOW TO INSTALL?
+6. HOW TO INSTALL?
 cd truecrack
 ./configure
 make
 sudo make install
  
-6. LICENSE
+7. LICENSE
 TrueCrack is an Open Source Software under GNU Public License version 3.
 This software is Based on TrueCrypt, freely available at http://www.truecrypt.org/
 Contact the author:  Luca Vaccaro <luck87@gmail.com>
