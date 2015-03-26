@@ -1,0 +1,35 @@
+HOW TO INSTALL CUDA
+-------------------
+
+Nvidia provides two main version:  
+- CUDA TOOLKIT 4.0 (MAY 2011): stable version ( http://developer.nvidia.com/cuda-toolkit-40 )
+- THE CUDA 4.1 RELEASE CANDIDATE2 (RC2): unstable version ( http://developer.nvidia.com/cuda-toolkit-41 )
+
+CUDA TOOLKIT 4.0 (MAY 2011)
+---------------------------
+If you use the cuda stable version 4.0 remember the following rules:
+- compile the old nvidia developer driver 270.41.19 <= you can compile it if and only if you use a kernel of the family 2.6
+- install the 4.0 toolkit, the sdk and set the opportune environment variables with the path of your cuda directory
+- use a gcc compiler of the family 4.4 <= gcc 4.5 and 4.6 are not supported with CUDA
+
+THE CUDA 4.1 RELEASE CANDIDATE2 (RC2)
+-------------------------------------
+Else if you use the cuda release candidate version 4.0 remember the following rules:
+- compile the old nvidia developer driver 285.05.23 <= you can compile with a kernel of the family 2.6.x or 3.x
+- install the 4.1 toolkit, the sdk and set the opportune environment variables with the path of your cuda directory
+- use a gcc compiler of the family 4.4 <= gcc 4.5 and 4.6 are not supported with CUDA
+
+
+WARNINGS ABOUT GCC VERSION
+--------------------------
+In the release candidate version 4.1, if you compile the software (make GPU=true) with a unsupported gcc version, it appears the following message:
+"#error -- unsupported GNU version! gcc 4.6 and up are not supported!"
+If you used the cuda stable version 4.0, this message don't appear and the compilation ends without errors. Anyway the program don't work correctly.
+
+WARNINGS ABOUT DRIVER VERSION
+-----------------------------
+If you compile and use a version of nvidia driver different or upper (as the most recent version) the program crash, the system crash andthe machine crash.
+
+CONCLUSION
+----------
+Have a good day and enjoy yourself in cracking password,
