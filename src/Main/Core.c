@@ -30,6 +30,7 @@
 #include "CpuCore.h"
 #endif
 
+
 /* Buffer with header */
 char header[512]={0};
 int header_length;
@@ -259,7 +260,7 @@ void core(void){
 			if (block_size==0)
 				break;
 
-			cpu_Core_dictionary(CORE_encryptionAlgorithm,1, header, blockPwd, blockPwd_init, blockPwd_length, result, CORE_keyDerivationFunction);
+			Core_dictionary(CORE_encryptionAlgorithm,1, header, blockPwd, blockPwd_init, blockPwd_length, result, CORE_keyDerivationFunction);
 			
 			if(result[0]==1)
 				status=1;
@@ -454,7 +455,7 @@ void core(void){
 			for (;iblock<maxcombination && status==0;iblock+=1){
 				computePwd (iblock, maxcombination, strlen(CORE_charset),CORE_charset, wordlength, word);
 				word[wordlength]='\0';
-				value=cpu_Core_charset ( CORE_encryptionAlgorithm,header, CORE_charset, word,  wordlength,CORE_keyDerivationFunction, CORE_prefix);
+				value=Core_charset ( CORE_encryptionAlgorithm,header, CORE_charset, word,  wordlength,CORE_keyDerivationFunction, CORE_prefix);
 
 				if (value==1)
 					status=1;

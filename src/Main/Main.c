@@ -27,7 +27,6 @@
 /* The name of this program.*/
 const char *program_name;
 
-
 /* Prints usage information for this program to STREAM (typically
    stdout or stderr), and exit the program with EXIT_CODE. Does not
    return. */
@@ -48,7 +47,10 @@ void print_usage (FILE* stream, int exit_code)
 			" -t --truecrypt <truecrypt_file>		Truecrypt volume file.\n"
 			" -k --key <ripemd160 | sha512 | whirlpool>	Key derivation function (default ripemd160).\n"
 			" -e --encryption <aes | serpent | twofish>	Encryption algorithm (default aes).\n"
-			" -a --aggressive <blocks>			Number of parallel computations (board dependent).\n"
+			" -e --encryption <CHIPERS>			Cascade encryption algorithm (only for CPU).\n"
+			"      CHIPERS :\n"
+			"      aes | serpent | twofish | twofish-aes | serpent-twofish-aes | aes-serpent | aes-twofish-serpent | serpent-twofish \n"
+			" -a --aggressive <blocks>			Number of parallel computations (only for GPU and board dependent).\n"
 			" -w --wordlist <wordlist_file>			File of words, for Dictionary attack.\n"
 			" -c --charset <alphabet>			Alphabet generator, for Alphabet attack.\n"
 			" -s --startlength <minlength>			Starting length of passwords, for Alphabet attack (default 1).\n"
@@ -221,6 +223,8 @@ int main (int argc, char* argv[])
 	else
 		print_usage (stdout, 0);
 
+
+	// Encryption Algorithms
 	if (encryptionAlgorithm==NULL)
 		CORE_encryptionAlgorithm=AES;
 	else if (strcasecmp(encryptionAlgorithm,"aes")==0)
@@ -229,8 +233,19 @@ int main (int argc, char* argv[])
 		CORE_encryptionAlgorithm=SERPENT;
 	else if (strcasecmp(encryptionAlgorithm,"twofish")==0)
 		CORE_encryptionAlgorithm=TWOFISH;
+	else if (strcasecmp(encryptionAlgorithm,"twofish-aes")==0)
+		CORE_encryptionAlgorithm=TWOFISH_AES;
+	else if (strcasecmp(encryptionAlgorithm,"serpent-twofish-aes")==0)
+		CORE_encryptionAlgorithm=SERPENT_TWOFISH_AES;
+	else if (strcasecmp(encryptionAlgorithm,"aes-serpent")==0)
+		CORE_encryptionAlgorithm=AES_SERPENT;
+	else if (strcasecmp(encryptionAlgorithm,"aes-twofish-serpent")==0)
+		CORE_encryptionAlgorithm=AES_TWOFISH_SERPENT;
+	else if (strcasecmp(encryptionAlgorithm,"serpent-twofish")==0)
+		CORE_encryptionAlgorithm=SERPENT_TWOFISH;
 	else
 		print_usage (stdout, 0);
+
 
 	if (keyDerivationFunction==NULL)
 		CORE_keyDerivationFunction=RIPEMD160;
@@ -275,4 +290,3 @@ int main (int argc, char* argv[])
 
 	return 0;
 }
-

@@ -20,10 +20,10 @@
 #define HEADER_CORE
 
 #define SOFTWARE	"TrueCrack"
-#define VERSION		"3.6"
+#define VERSION		"3.7"
 #define WEBSITE		"http://code.google.com/p/truecrack"
 #define AUTHOR		"Luca Vaccaro"
-#define EMAIL		"infotruecrack@gmail.com"
+#define EMAIL		"luck87@gmail.com"
 #define MESSAGE 	"Bruteforce password cracker for Truecrypt volume. Optimazed with Nvidia Cuda technology.\nBased on TrueCrypt, freely available at http://www.truecrypt.org/\nCopyright (c) 2011 by Luca Vaccaro."
 
 
@@ -34,6 +34,19 @@ enum {
     ATTACK_DICTIONARY=1,
     ATTACK_CHARSET
 };
+
+enum CORE_EncryptionAlgorithms {
+	NONE = 0,
+	AES,
+	SERPENT,
+	TWOFISH,
+	TWOFISH_AES,
+	SERPENT_TWOFISH_AES,
+	AES_SERPENT,
+	AES_TWOFISH_SERPENT,
+	SERPENT_TWOFISH
+};
+
 
 /* The name of the file of words */
 char *CORE_wordsPath;
@@ -60,10 +73,11 @@ int CORE_backup;
 /* Hidden volume */
 int CORE_hidden;
 /* Encryption Algorithm */
-int CORE_encryptionAlgorithm;
+enum CORE_EncryptionAlgorithms CORE_encryptionAlgorithm;
 /* Prefix string */
 unsigned char *CORE_prefix;
 /* Main function */
 void core(void);
+
 
 #endif

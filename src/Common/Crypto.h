@@ -131,20 +131,20 @@ enum
 // Number of ciphertext/plaintext blocks per XTS data unit
 #define BLOCKS_PER_XTS_DATA_UNIT	(ENCRYPTION_DATA_UNIT_SIZE / BYTES_PER_XTS_BLOCK)
 
-
+/*
 // Cipher IDs
 enum
 {
 	NONE = 0,
 	AES,
 	SERPENT,			
-	TWOFISH,			
+	TWOFISH,		
 #ifndef TC_WINDOWS_BOOT
 	BLOWFISH,		// Deprecated/legacy
 	CAST,			// Deprecated/legacy
 	TRIPLEDES		// Deprecated/legacy
 #endif
-};
+};*/
 
 typedef struct
 {
@@ -236,7 +236,7 @@ typedef struct CRYPTO_INFO_t
 
 	//unsigned __int8 master_keydata[MASTER_KEYDATA_SIZE];	/* This holds the volume header area containing concatenated master key(s) and secondary key(s) (XTS mode). For LRW (deprecated/legacy), it contains the tweak key before the master key(s). For CBC (deprecated/legacy), it contains the IV seed before the master key(s). */
 	//unsigned __int8 k2[MASTER_KEYDATA_SIZE];				/* For XTS, this contains the secondary key (if cascade, multiple concatenated). For LRW (deprecated/legacy), it contains the tweak key. For CBC (deprecated/legacy), it contains the IV seed. */
-	unsigned __int8 km2[MASTER_KEYDATA_SIZE];				/* For XTS, this contains the secondary key (if cascade, multiple concatenated). For LRW (deprecated/legacy), it contains the tweak key. For CBC (deprecated/legacy), it contains the IV seed. */
+	unsigned __int8 k2[MASTER_KEYDATA_SIZE];				/* For XTS, this contains the secondary key (if cascade, multiple concatenated). For LRW (deprecated/legacy), it contains the tweak key. For CBC (deprecated/legacy), it contains the IV seed. */
 	
 	//unsigned __int8 salt[PKCS5_SALT_SIZE];
 	int noIterations;
@@ -341,5 +341,8 @@ BOOL IsHwEncryptionEnabled ();
 #ifdef __cplusplus
 }
 #endif
+
+
+
 
 #endif		/* CRYPTO_H */

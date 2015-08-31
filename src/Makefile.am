@@ -11,7 +11,7 @@ Main.o
 
 OBJS_CRYPTO =
 
-CFLAGS = -g -I./Common/ -I./Crypto/ -I./Cuda/ -I./Main/ -I./ -I/usr/local/cuda/include/ 
+CFLAGS = -g -w -I./Common/ -I./Crypto/ -I./Cuda/ -I./Main/ -I./ -I/usr/local/cuda/include/ 
 LFLAGS = -lm -O3 
 
 if DARWIN

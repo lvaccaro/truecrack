@@ -39,7 +39,6 @@
 #include "Serpent.h"
 #include "Twofish.h"
 
-
 enum
 {
 	UNDEFINED=0,
@@ -54,18 +53,18 @@ enum
 };
 #define max(x, y) (((x) > (y)) ? (x) : (y))
 #define min(x, y) (((x) < (y)) ? (x) : (y))
-int cpu_GetMaxPkcs5OutSize (void)
+int GetMaxPkcs5OutSize (void)
 {
 	int size = 32;// Sizes of primary + secondary keys
 	size = max (size, 32 * 2);	// Sizes of primary + secondary keys
-	//size = max (size, cpu_EAGetLargestKeyForMode (XTS) * 2);	// Sizes of primary + secondary keys
+	size = max (size, EAGetLargestKeyForMode (XTS) * 2);	// Sizes of primary + secondary keys
 	return size;
 }
 
 
 
 
-int cpu_Core_charset(int encryptionAlgorithm,unsigned char *encryptedHeader, unsigned char *CORE_charset, unsigned char *word_, int wordlength, int keyDerivationFunction, unsigned char* prefix) {
+int Core_charset(enum CORE_EncryptionAlgorithms encryptionAlgorithm,unsigned char *encryptedHeader, unsigned char *CORE_charset, unsigned char *word_, int wordlength, int keyDerivationFunction, unsigned char* prefix) {
 	// PKCS5 is used to derive the primary header key(s) and secondary header key(s) (XTS mode) from the password
 	int i,j,value=-1,found;
 	unsigned char salt[PKCS5_SALT_SIZE];
@@ -89,17 +88,17 @@ int cpu_Core_charset(int encryptionAlgorithm,unsigned char *encryptedHeader, uns
 		maxcombination*= strlen(CORE_charset);
 
 	if(keyDerivationFunction==RIPEMD160)
-		derive_key_ripemd160 ( word, wordlength+1, salt, PKCS5_SALT_SIZE, 2000, headerKey, cpu_GetMaxPkcs5OutSize ());
+		derive_key_ripemd160 ( word, wordlength+1, salt, PKCS5_SALT_SIZE, 2000, headerKey, GetMaxPkcs5OutSize ());
 	else if(keyDerivationFunction==SHA512)
-		derive_key_sha512 (  word, wordlength+1, salt, PKCS5_SALT_SIZE, 1000, headerKey, cpu_GetMaxPkcs5OutSize ());
+		derive_key_sha512 (  word, wordlength+1, salt, PKCS5_SALT_SIZE, 1000, headerKey, GetMaxPkcs5OutSize ());
 	else if(keyDerivationFunction==WHIRLPOOL)
-		derive_key_whirlpool (  word, wordlength+1, salt, PKCS5_SALT_SIZE, 1000, headerKey, cpu_GetMaxPkcs5OutSize ());
+		derive_key_whirlpool (  word, wordlength+1, salt, PKCS5_SALT_SIZE, 1000, headerKey, GetMaxPkcs5OutSize ());
 	else{
 		perror("Key derivation function not supported");
-		return;
+		return 0;
 	}
 
-	value=cpu_Xts(encryptionAlgorithm,encryptedHeader,headerKey,cpu_GetMaxPkcs5OutSize(), masterKey, &length);
+	value=Xts(encryptionAlgorithm,encryptedHeader,headerKey,GetMaxPkcs5OutSize(), masterKey, &length);
 
 	if (value==SUCCESS)
 		return 1;
@@ -108,11 +107,11 @@ int cpu_Core_charset(int encryptionAlgorithm,unsigned char *encryptedHeader, uns
 
 
 
-void cpu_Core_dictionary(int encryptionAlgorithm, int blocksize, unsigned char *encryptedHeader, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result, int keyDerivationFunction) {
+void Core_dictionary(enum CORE_EncryptionAlgorithms encryptionAlgorithm,  int blocksize, unsigned char *encryptedHeader, unsigned char *blockPwd, int *blockPwd_init, int *blockPwd_length, short int *result, int keyDerivationFunction) {
 	// PKCS5 is used to derive the primary header key(s) and secondary header key(s) (XTS mode) from the password
 	int i,j,value=-1,found;
 	unsigned char salt[PKCS5_SALT_SIZE];
-	unsigned char headerKey[MASTER_KEYDATA_SIZE];
+	unsigned char headerKey[MASTER_KEYDATA_SIZE]={0};
 	memcpy (salt, encryptedHeader + HEADER_SALT_OFFSET, PKCS5_SALT_SIZE);
 
 
@@ -120,17 +119,23 @@ void cpu_Core_dictionary(int encryptionAlgorithm, int blocksize, unsigned char *
 	for (i=0;i<blocksize && found==0;i++) {
 
 		if(keyDerivationFunction==RIPEMD160)
-			derive_key_ripemd160 ( blockPwd+blockPwd_init[i], blockPwd_length[i], salt, PKCS5_SALT_SIZE, 2000, headerKey, cpu_GetMaxPkcs5OutSize ());
+			derive_key_ripemd160 ( blockPwd+blockPwd_init[i], blockPwd_length[i], salt, PKCS5_SALT_SIZE, 2000, headerKey, GetMaxPkcs5OutSize ());
 		else if(keyDerivationFunction==SHA512)
-			derive_key_sha512 ( blockPwd+blockPwd_init[i], blockPwd_length[i], salt, PKCS5_SALT_SIZE, 1000, headerKey, cpu_GetMaxPkcs5OutSize ());
+			derive_key_sha512 ( blockPwd+blockPwd_init[i], blockPwd_length[i], salt, PKCS5_SALT_SIZE, 1000, headerKey, GetMaxPkcs5OutSize ());
 		else if(keyDerivationFunction==WHIRLPOOL)
-			derive_key_whirlpool ( blockPwd+blockPwd_init[i], blockPwd_length[i], salt, PKCS5_SALT_SIZE, 1000, headerKey, cpu_GetMaxPkcs5OutSize ());
+			derive_key_whirlpool ( blockPwd+blockPwd_init[i], blockPwd_length[i], salt, PKCS5_SALT_SIZE, 1000, headerKey, GetMaxPkcs5OutSize ());
 		else{
 			perror("Key derivation function not supported");
 			return;
 		}
+/*
+	printf("headerKey[%d]: ",GetMaxPkcs5OutSize()); 
+	for (int i=0;i<MASTER_KEYDATA_SIZE;i++)
+		printf("%02x",(unsigned short)headerKey[i]);
+	printf("\n");
+	*/
 
-		result[i]=cpu_Xts(encryptionAlgorithm,encryptedHeader,headerKey,cpu_GetMaxPkcs5OutSize(), NULL, NULL);
+		result[i]=Xts(encryptionAlgorithm,encryptedHeader,headerKey,GetMaxPkcs5OutSize(), NULL, NULL);
 		if (result[i]==SUCCESS)
 			found=1;
 	}
@@ -141,7 +146,7 @@ void cpu_Core_dictionary(int encryptionAlgorithm, int blocksize, unsigned char *
 
 // Encrypts or decrypts all blocks in the buffer in XTS mode. For descriptions of the input parameters,
 // see the 64-bit version of EncryptBufferXTS().
-void cpu_EncryptDecryptBufferXTS32 (const unsigned __int8 *buffer,
+void EncryptDecryptBufferXTS32 (const unsigned __int8 *buffer,
 		TC_LARGEST_COMPILER_UINT length,
 		const UINT64_STRUCT *startDataUnitNo,
 		unsigned int startBlock,
@@ -174,7 +179,7 @@ void cpu_EncryptDecryptBufferXTS32 (const unsigned __int8 *buffer,
 
 	// Convert the 64-bit data unit number into a little-endian 16-byte array.
 	// (Passed as two 32-bit integers for compatibility with non-64-bit environments/platforms.)
-	cpu_Uint64ToLE16ByteArray (byteBufUnitNo, dataUnitNo.HighPart, dataUnitNo.LowPart);
+	Uint64ToLE16ByteArray (byteBufUnitNo, dataUnitNo.HighPart, dataUnitNo.LowPart);
 
 	// Generate whitening values for all blocks in the buffer
 	while (blockCount > 0)
@@ -188,7 +193,7 @@ void cpu_EncryptDecryptBufferXTS32 (const unsigned __int8 *buffer,
 		// Encrypt the data unit number using the secondary key (in order to generate the first
 		// whitening value for this data unit)
 		memcpy (whiteningValue, byteBufUnitNo, BYTES_PER_XTS_BLOCK);
-		cpu_EncipherBlock (cipher, whiteningValue, ks2);
+		EncipherBlock (cipher, whiteningValue, ks2);
 
 		// Generate (and apply) subsequent whitening values for blocks in this data unit and
 		// encrypt/decrypt all relevant blocks in this data unit
@@ -208,9 +213,9 @@ void cpu_EncryptDecryptBufferXTS32 (const unsigned __int8 *buffer,
 
 				// Actual encryption/decryption
 				if (decryption)
-					cpu_DecipherBlock (cipher, bufPtr32, ks);
+					DecipherBlock (cipher, bufPtr32, ks);
 				else
-					cpu_EncipherBlock (cipher, bufPtr32, ks);
+					EncipherBlock (cipher, bufPtr32, ks);
 
 				whiteningValuePtr32 = (unsigned __int32 *) whiteningValue;
 
@@ -259,14 +264,14 @@ void cpu_EncryptDecryptBufferXTS32 (const unsigned __int8 *buffer,
 		}
 
 		// Convert the 64-bit data unit number into a little-endian 16-byte array.
-		cpu_Uint64ToLE16ByteArray (byteBufUnitNo, dataUnitNo.HighPart, dataUnitNo.LowPart);
+		Uint64ToLE16ByteArray (byteBufUnitNo, dataUnitNo.HighPart, dataUnitNo.LowPart);
 	}
 
 	FAST_ERASE64 (whiteningValue, sizeof (whiteningValue));
 }
 
 // For descriptions of the input parameters, see the 64-bit version of EncryptBufferXTS() above.
-void cpu_EncryptBufferXTS (unsigned __int8 *buffer,
+void EncryptBufferXTS (unsigned __int8 *buffer,
 		TC_LARGEST_COMPILER_UINT length,
 		const UINT64_STRUCT *startDataUnitNo,
 		unsigned int startCipherBlockNo,
@@ -275,12 +280,12 @@ void cpu_EncryptBufferXTS (unsigned __int8 *buffer,
 		int cipher)
 {
 	// Encrypt all plaintext blocks in the buffer
-	cpu_EncryptDecryptBufferXTS32 (buffer, length, startDataUnitNo, startCipherBlockNo, ks, ks2, cipher, FALSE);
+	EncryptDecryptBufferXTS32 (buffer, length, startDataUnitNo, startCipherBlockNo, ks, ks2, cipher, FALSE);
 }
 
 
 // For descriptions of the input parameters, see the 64-bit version of EncryptBufferXTS().
-void cpu_DecryptBufferXTS (unsigned __int8 *buffer,
+void DecryptBufferXTS (unsigned __int8 *buffer,
 		TC_LARGEST_COMPILER_UINT length,
 		const UINT64_STRUCT *startDataUnitNo,
 		unsigned int startCipherBlockNo,
@@ -289,10 +294,10 @@ void cpu_DecryptBufferXTS (unsigned __int8 *buffer,
 		int cipher)
 {
 	// Decrypt all ciphertext blocks in the buffer
-	cpu_EncryptDecryptBufferXTS32 (buffer, length, startDataUnitNo, startCipherBlockNo, ks, ks2, cipher, TRUE);
+	EncryptDecryptBufferXTS32 (buffer, length, startDataUnitNo, startCipherBlockNo, ks, ks2, cipher, TRUE);
 }
-
-void cpu_DecryptBuffer (unsigned __int8 *buf, TC_LARGEST_COMPILER_UINT len, PCRYPTO_INFO cryptoInfo)
+/*
+void DecryptBuffer (unsigned __int8 *buf, TC_LARGEST_COMPILER_UINT len, PCRYPTO_INFO cryptoInfo)
 {
 	UINT64_STRUCT dataUnitNo;
 	int cipher;
@@ -303,20 +308,56 @@ void cpu_DecryptBuffer (unsigned __int8 *buf, TC_LARGEST_COMPILER_UINT len, PCRY
 	dataUnitNo.LowPart = 0;
 	dataUnitNo.HighPart = 0;
 
-	cpu_DecryptBufferXTS (buf, len, &dataUnitNo, 0, cryptoInfo->ks, cryptoInfo->ks2, cryptoInfo->ea);
+	DecryptBufferXTS (buf, len, &dataUnitNo, 0, cryptoInfo->ks, cryptoInfo->ks2, cryptoInfo->ea);
+}
+*/
+
+// DecryptBuffer
+//
+// buf:  data to be decrypted; the start of the buffer is assumed to be aligned with the start of a data unit.
+// len:  number of bytes to decrypt; must be divisible by the block size (for cascaded ciphers, divisible 
+//       by the largest block size used within the cascade)
+void DecryptBuffer (unsigned __int8 *buf, TC_LARGEST_COMPILER_UINT len, PCRYPTO_INFO cryptoInfo)
+{
+	switch (cryptoInfo->mode)
+	{
+	case XTS:
+		{
+			unsigned __int8 *ks = cryptoInfo->ks + EAGetKeyScheduleSize (cryptoInfo->ea);
+			unsigned __int8 *ks2 = cryptoInfo->ks2 + EAGetKeyScheduleSize (cryptoInfo->ea);
+			UINT64_STRUCT dataUnitNo;
+			int cipher;
+
+			// When encrypting/decrypting a buffer (typically a volume header) the sequential number
+			// of the first XTS data unit in the buffer is always 0 and the start of the buffer is
+			// always assumed to be aligned with the start of the data unit 0.
+			dataUnitNo.LowPart = 0;
+			dataUnitNo.HighPart = 0;
+
+			for (cipher = EAGetLastCipher (cryptoInfo->ea);
+				cipher != 0;
+				cipher = EAGetPreviousCipher (cryptoInfo->ea, cipher))
+			{
+				ks -= CipherGetKeyScheduleSize (cipher);
+				ks2 -= CipherGetKeyScheduleSize (cipher);
+
+				DecryptBufferXTS (buf, len, &dataUnitNo, 0, ks, ks2, cipher);
+			}
+		}
+		break;
+	}
 }
 
 
 
 
-
-int cpu_Xts(int encryptionAlgorithm, char *encryptedHeader, char *headerKey, int headerKey_length, char *masterKey, int *masterKey_length) {
+int Xts(enum CORE_EncryptionAlgorithms encryptionAlgorithm, char *encryptedHeader, char *headerKey, int headerKey_length, char *masterKey, int *masterKey_length) {
 	BOOL ReadVolumeHeaderRecoveryMode = FALSE;
 	char header[TC_VOLUME_HEADER_EFFECTIVE_SIZE];
 	PCRYPTO_INFO cryptoInfo;
 	uint16 headerVersion;
 	int status = ERR_PARAMETER_INCORRECT;
-	int primaryKeyOffset=0;
+	int primaryKeyOffset=0; // Test all available modes of operation: default = 0
 	CRYPTO_INFO cryptoInfo_struct;
 
 	//int pkcs5PrfCount = LAST_PRF_ID - FIRST_PRF_ID + 1;
@@ -330,28 +371,67 @@ int cpu_Xts(int encryptionAlgorithm, char *encryptedHeader, char *headerKey, int
 
 	// Support only XTS
 	cryptoInfo->mode= XTS ;
-	if(encryptionAlgorithm!=AES && encryptionAlgorithm!=SERPENT && encryptionAlgorithm!=TWOFISH)
-		return ERR_CIPHER_INIT;
-	cryptoInfo->ea=encryptionAlgorithm;
 
-	status = cpu_EAInit (cryptoInfo->ea, headerKey + primaryKeyOffset, cryptoInfo->ks);
+	// Parse Encryption Algorithms		
+	cryptoInfo->ea=0;
+	if (CORE_encryptionAlgorithm==AES)
+		cryptoInfo->ea=1;
+	if (CORE_encryptionAlgorithm==SERPENT)
+		cryptoInfo->ea=2;
+	if (CORE_encryptionAlgorithm==TWOFISH)
+		cryptoInfo->ea=3;
+	if (CORE_encryptionAlgorithm==TWOFISH_AES)
+		cryptoInfo->ea=4;
+	if (CORE_encryptionAlgorithm==SERPENT_TWOFISH_AES)
+		cryptoInfo->ea=5;
+	if (CORE_encryptionAlgorithm==AES_SERPENT)
+		cryptoInfo->ea=6;
+	if (CORE_encryptionAlgorithm==AES_TWOFISH_SERPENT)
+		cryptoInfo->ea=7;
+	if (CORE_encryptionAlgorithm==SERPENT_TWOFISH)
+		cryptoInfo->ea=8;
+/*
+	printf("cryptoInfo->ea: %d\n",cryptoInfo->ea);
+	printf("EAGetKeySize: %d\n",EAGetKeySize(cryptoInfo->ea));
+*/
+	memcpy (cryptoInfo->ks, headerKey , EAGetKeySize (cryptoInfo->ea));
+	status = EAInit (cryptoInfo->ea, headerKey + 0, cryptoInfo->ks);
 	if (status == ERR_CIPHER_INIT_FAILURE)
 		return ERR_CIPHER_INIT;
-	// Init objects related to the mode of operation
 
-	// Copy the secondary key (if cascade, multiple concatenated)
-	//memcpy (cryptoInfo->km2, headerKey + EAGetKeySize (cryptoInfo->ea), EAGetKeySize (cryptoInfo->ea));
-	memcpy (cryptoInfo->km2, headerKey + 32, 32);
-	// Secondary key schedule
-	if (!cpu_EAInitMode (cryptoInfo)) {
-		return ERR_MODE_INIT;
-	}
+	// Init objects related to the mode of operation
+	//if (cryptoInfo->mode == XTS){
+		// Copy the secondary key (if cascade, multiple concatenated)
+		memcpy (cryptoInfo->k2, headerKey + EAGetKeySize (cryptoInfo->ea), EAGetKeySize (cryptoInfo->ea));
+    	
+		// Secondary key schedule
+		if (!EAInitMode (cryptoInfo))
+		{
+			return ERR_MODE_INIT_FAILED;
+		}
+		// or EAInit (cryptoInfo->ea, cryptoInfo->k2, cryptoInfo->ks2) 
+    
+/*
+	printf("cryptoInfo->ks: "); 
+	for (int i=0;i<256;i++)
+		printf("%02x",(unsigned short)cryptoInfo->ks[i]);
+	printf("\n");
+	printf("cryptoInfo->ks2: "); 
+	for (int i=0;i<256;i++)
+		printf("%02x",(unsigned short)cryptoInfo->ks2[i]);
+	printf("\n");
+	printf("cryptoInfo->k2: "); 
+	for (int i=0;i<256;i++)
+		printf("%02x",(unsigned short)cryptoInfo->k2[i]);
+	printf("\n");
+*/
 
 	// Copy the header for decryption
 	memcpy (header, encryptedHeader, 512*sizeof(unsigned char));
 
+
 	// Try to decrypt header
-	cpu_DecryptBuffer (header + HEADER_ENCRYPTED_DATA_OFFSET, HEADER_ENCRYPTED_DATA_SIZE, cryptoInfo);
+	DecryptBuffer (header + HEADER_ENCRYPTED_DATA_OFFSET, HEADER_ENCRYPTED_DATA_SIZE, cryptoInfo);
 
 	// Magic 'TRUE'
 	if (GetHeaderField32 (header, TC_HEADER_OFFSET_MAGIC) != 0x54525545)
